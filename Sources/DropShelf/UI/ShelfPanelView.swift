@@ -75,6 +75,8 @@ struct ShelfPanelView: View {
 
             Text("DropShelf")
                 .font(.system(size: 12.5, weight: .bold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
             if store.totalFileCount > 0 {
                 Text("\(store.totalFileCount)")
@@ -84,9 +86,10 @@ struct ShelfPanelView: View {
                     .background(Color.accentColor.opacity(0.18))
                     .foregroundStyle(Color.accentColor)
                     .clipShape(Capsule())
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 2)
 
             Button {
                 if !store.addFromGeneralClipboard() {
@@ -95,7 +98,7 @@ struct ShelfPanelView: View {
             } label: {
                 Image(systemName: "doc.on.clipboard")
                     .font(.system(size: 11.5, weight: .medium))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -106,7 +109,7 @@ struct ShelfPanelView: View {
             } label: {
                 Image(systemName: settings.isShelfPinned ? "pin.fill" : "pin")
                     .font(.system(size: 11.5, weight: .semibold))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
                     .foregroundStyle(settings.isShelfPinned ? Color.orange : Color.secondary)
             }
             .buttonStyle(.plain)
@@ -118,7 +121,7 @@ struct ShelfPanelView: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 11.5, weight: .medium))
-                        .frame(width: 22, height: 22)
+                        .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -130,7 +133,7 @@ struct ShelfPanelView: View {
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 11.5, weight: .medium))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -141,7 +144,7 @@ struct ShelfPanelView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -166,7 +169,7 @@ struct ShelfPanelView: View {
                 .foregroundStyle(targeted ? Color.accentColor : Color.primary)
 
             if isEmpty {
-                Text("Ảnh chụp màn hình tự nhảy vào đây.\nHỗ trợ tệp, thư mục, Stack, ảnh & văn bản.")
+                Text("Ảnh chụp màn hình tự nhảy vào đây tức thì.\nHỗ trợ tệp, thư mục, Stack, ảnh & văn bản.")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -369,7 +372,7 @@ private struct ShelfEntryCardView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .trailing) {
             HStack(spacing: 10) {
                 thumbnailView
 
@@ -393,7 +396,9 @@ private struct ShelfEntryCardView: View {
                             let badgeColor: Color = (kind == .screenshot) ? .teal : .indigo
                             Text(badge)
                                 .font(.system(size: 9, weight: .semibold))
-                                .padding(.horizontal, 4.5)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background(badgeColor.opacity(0.18))
                                 .foregroundStyle(badgeColor)
@@ -407,7 +412,7 @@ private struct ShelfEntryCardView: View {
                     }
                 }
 
-                Spacer(minLength: isHovered ? 64 : 6)
+                Spacer(minLength: 6)
             }
             .padding(.horizontal, 9)
             .frame(height: settings.shelfSize.cardHeight)
@@ -439,8 +444,6 @@ private struct ShelfEntryCardView: View {
 
             if isHovered && !isIncomingDragActive {
                 HStack(spacing: 3) {
-                    Spacer()
-
                     if entry.isStack {
                         cardIconButton(
                             symbol: store.expandedStackID == entry.id ? "chevron.up.circle.fill" : "square.stack.3d.up",
@@ -477,7 +480,14 @@ private struct ShelfEntryCardView: View {
                         store.removeEntry(entryID: entry.id)
                     }
                 }
-                .padding(.trailing, 7)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+                        .shadow(color: Color.black.opacity(0.12), radius: 3, y: 1)
+                )
+                .padding(.trailing, 6)
             }
         }
     }
@@ -530,11 +540,7 @@ private struct ShelfEntryCardView: View {
             Image(systemName: symbol)
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 22, height: 22)
-                .background(
-                    Circle()
-                        .fill(Color(nsColor: .windowBackgroundColor).opacity(0.88))
-                )
+                .frame(width: 20, height: 20)
         }
         .buttonStyle(.plain)
         .help(help)

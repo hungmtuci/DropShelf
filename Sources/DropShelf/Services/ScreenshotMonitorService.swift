@@ -8,10 +8,9 @@ final class ScreenshotMonitorService: ObservableObject {
     static let shared = ScreenshotMonitorService()
 
     @Published private(set) var watchedDirectories: [String] = []
-    @Published private(set) var isMacOSFloatingThumbnailEnabled: Bool = true
 
     private var fsEventStream: FSEventStreamRef?
-    private let fsEventQueue = DispatchQueue(label: "com.hunglx.DropShelf.ScreenshotFSEvents", qos: .userInitiated)
+    private let fsEventQueue = DispatchQueue(label: "com.hunglx.DropShelf.ScreenshotFSEvents", qos: .userInteractive)
     private var clipboardPollTimer: Timer?
     private var folderConfigRefreshTimer: Timer?
     private var lastObservedClipboardChangeCount: Int
@@ -24,7 +23,6 @@ final class ScreenshotMonitorService: ObservableObject {
 
     private init() {
         self.lastObservedClipboardChangeCount = NSPasteboard.general.changeCount
-        self.isMacOSFloatingThumbnailEnabled = Self.readMacOSShowThumbnailFlag()
     }
 
     func start() {
@@ -40,7 +38,7 @@ final class ScreenshotMonitorService: ObservableObject {
     }
 
     func syncMonitoringState() {
-        isMacOSFloatingThumbnailEnabled = Self.readMacOSShowThumbnailFlag()
+        applyMacOSInstantScreenshotPreference()
 
         guard AppSettings.shared.autoCaptureScreenshots else {
             stop()
@@ -69,32 +67,48 @@ final class ScreenshotMonitorService: ObservableObject {
                         self.watchedDirectories = updated
                         self.restartFSEventStream(for: updated)
                     }
-                    self.isMacOSFloatingThumbnailEnabled = Self.readMacOSShowThumbnailFlag()
                 }
             }
         }
     }
 
-    /// Called by ShelfStore whenever DropShelf itself writes to `NSPasteboard.general`
-    /// so we never treat our own copy action as a new Clipboard Screenshot.
     func markInternalClipboardWrite() {
         lastObservedClipboardChangeCount = NSPasteboard.general.changeCount
     }
 
-    /// Optional convenience helper allowing the user to toggle macOS's 5-second Floating Thumbnail delay (`show-thumbnail`).
-    func setMacOSFloatingThumbnailEnabled(_ enabled: Bool) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        proc.arguments = ["write", "com.apple.screencapture", "show-thumbnail", "-bool", enabled ? "true" : "false"]
-        try? proc.run()
-        proc.waitUntilExit()
-        isMacOSFloatingThumbnailEnabled = Self.readMacOSShowThumbnailFlag()
-        AppSettings.shared.statusBannerMessage = enabled
-            ? "Đã bật lại ảnh thu nhỏ góc dưới của macOS (ảnh vào kệ sau ~4s)."
-            : "Đã tắt chờ ảnh thu nhỏ macOS — ảnh chụp màn hình mới sẽ nhảy vào Kệ tức thì (0 giây)!"
+    /// Ensures `screencaptureui` (`⌘⇧3` Full Screen, `⌘⇧4` Window/Portion, `⌘⇧5` Toolbar) writes files immediately (`0ms`)
+    /// instead of holding them in RAM inside `AnnotationsThumbWindow` at the bottom-right corner for 5–6 seconds!
+    func applyMacOSInstantScreenshotPreference() {
+        let shouldDisableMacOSDelay = AppSettings.shared.autoCaptureScreenshots && AppSettings.shared.instantScreenshotCapture
+        let desiredShowThumbnail = !shouldDisableMacOSDelay
+        let currentShowThumbnail = Self.readMacOSShowThumbnailFlag()
+        guard currentShowThumbnail != desiredShowThumbnail else { return }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            CFPreferencesSetAppValue(
+                "show-thumbnail" as CFString,
+                desiredShowThumbnail ? kCFBooleanTrue : kCFBooleanFalse,
+                "com.apple.screencapture" as CFString
+            )
+            CFPreferencesAppSynchronize("com.apple.screencapture" as CFString)
+
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+            proc.arguments = ["write", "com.apple.screencapture", "show-thumbnail", "-bool", desiredShowThumbnail ? "true" : "false"]
+            try? proc.run()
+            proc.waitUntilExit()
+
+            // Terminate any idle lingering screencaptureui instance so the next screenshot uses the new flag immediately
+            let killProc = Process()
+            killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            killProc.arguments = ["screencaptureui"]
+            killProc.standardError = FileHandle.nullDevice
+            try? killProc.run()
+            killProc.waitUntilExit()
+        }
     }
 
-    // MARK: - FSEvents File-Level Screenshot Watcher (0% CPU, O(1) even in folders with 10,000+ files)
+    // MARK: - FSEvents File-Level Screenshot Watcher (20ms latency, 0% idle CPU)
 
     private func restartFSEventStream(for directories: [String]) {
         stopFSEventStream()
@@ -125,7 +139,7 @@ final class ScreenshotMonitorService: ObservableObject {
             nil,
             directories as CFArray,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            0.08,
+            0.02,
             flags
         ) else {
             return
@@ -149,7 +163,6 @@ final class ScreenshotMonitorService: ObservableObject {
         let url = URL(fileURLWithPath: rawPath).standardizedFileURL
         let fileName = url.lastPathComponent
 
-        // Ignore hidden dotfiles (.Screen Shot...) while macOS Floating Thumbnail is still open
         guard !fileName.hasPrefix(".") else { return }
 
         let ext = url.pathExtension.lowercased()
@@ -164,7 +177,6 @@ final class ScreenshotMonitorService: ObservableObject {
         let now = Date()
         let nowUptime = ProcessInfo.processInfo.systemUptime
 
-        // Prune dedup table older than 60s
         recentlyIngestedTimestamps = recentlyIngestedTimestamps.filter { (nowUptime - $0.value) < 60.0 }
         guard recentlyIngestedTimestamps[url.path] == nil else { return }
 
@@ -176,16 +188,14 @@ final class ScreenshotMonitorService: ObservableObject {
 
         let fileSize = resourceValues.fileSize ?? 0
         if fileSize == 0 {
-            // File may still be flushing right after creation; retry briefly once
-            if retryCount < 3 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+            if retryCount < 4 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
                     self?.evaluateCandidateFilePath(rawPath, retryCount: retryCount + 1)
                 }
             }
             return
         }
 
-        // Only capture freshly created/saved screenshots (within last 20 seconds)
         let refDate = resourceValues.creationDate ?? resourceValues.contentModificationDate ?? .distantPast
         guard abs(now.timeIntervalSince(refDate)) <= 20.0 else { return }
 
@@ -196,12 +206,10 @@ final class ScreenshotMonitorService: ObservableObject {
     }
 
     nonisolated private static func isVerifiedScreenshotFile(url: URL, fileName: String) -> Bool {
-        // 1. Primary native macOS check: extended attribute `com.apple.metadata:kMDItemIsScreenCapture`
         if getxattr(url.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) >= 0 {
             return true
         }
 
-        // 2. Third-party screenshot tools (CleanShot X, Shottr, Snipaste, Monosnap) or localized names
         let lower = fileName.lowercased()
         let knownPrefixes = [
             "screen shot",
@@ -227,7 +235,7 @@ final class ScreenshotMonitorService: ObservableObject {
         guard clipboardPollTimer == nil else { return }
         lastObservedClipboardChangeCount = NSPasteboard.general.changeCount
 
-        clipboardPollTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
+        clipboardPollTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkClipboardForNewScreenshot()
             }
@@ -248,8 +256,6 @@ final class ScreenshotMonitorService: ObservableObject {
 
         guard let types = pb.types, !types.isEmpty else { return }
 
-        // A Clipboard Screenshot (`screencapture -c` / Cmd+Ctrl+Shift+4) puts pure bitmap image data
-        // WITHOUT file URLs, plain text, HTML, RTF, or browser source URLs.
         let hasImageBitmap = types.contains(.png) || types.contains(.tiff)
         guard hasImageBitmap else { return }
 
@@ -293,7 +299,6 @@ final class ScreenshotMonitorService: ObservableObject {
             }
         }
 
-        // Always include ~/Desktop as fallback in case system defaults reset
         let desktopPath = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Desktop", isDirectory: true)
             .standardizedFileURL.path
@@ -311,6 +316,7 @@ final class ScreenshotMonitorService: ObservableObject {
     }
 
     nonisolated static func readMacOSShowThumbnailFlag() -> Bool {
+        CFPreferencesAppSynchronize("com.apple.screencapture" as CFString)
         if let scDefaults = UserDefaults(suiteName: "com.apple.screencapture"),
            scDefaults.object(forKey: "show-thumbnail") != nil {
             return scDefaults.bool(forKey: "show-thumbnail")

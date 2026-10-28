@@ -80,7 +80,7 @@ struct SettingsDashboardView: View {
                         .clipShape(Capsule())
                 }
 
-                Text("Kệ tạm thời lấy cảm hứng từ Yoink — kéo thả tệp vào cạnh màn hình, tự động gom ảnh chụp màn hình mới và tự ẩn gọn sau 3 giây khi trống.")
+                Text("Kệ tạm thời lấy cảm hứng từ Yoink — kéo thả tệp vào cạnh màn hình, tự động gom ảnh chụp màn hình mới tức thì (0 giây) và tự ẩn gọn sau 3 giây khi trống.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -240,7 +240,7 @@ struct SettingsDashboardView: View {
 
     private var screenshotAutoCaptureSection: some View {
         sectionContainer(
-            title: "TỰ ĐỘNG ĐƯA HÌNH CHỤP MÀN HÌNH VÀO KỆ (SCREENSHOT AUTO-CAPTURE)",
+            title: "TỰ ĐỘNG ĐƯA HÌNH CHỤP MÀN HÌNH VÀO KỆ TỨC THÌ (SCREENSHOT 0 GIÂY)",
             icon: "camera.viewfinder"
         ) {
             VStack(alignment: .leading, spacing: 11) {
@@ -263,41 +263,13 @@ struct SettingsDashboardView: View {
                 }
 
                 if settings.autoCaptureScreenshots {
-                    Toggle("Tự động bắt cả ảnh chụp màn hình lưu vào Clipboard (⌘⌃⇧3 / ⌘⌃⇧4)", isOn: $settings.autoCaptureClipboardScreenshots)
+                    Toggle("Nhảy vào Kệ tức thì 0 giây cho cả Chụp toàn màn hình & ⌘⇧5 (Bỏ qua chờ 5s ảnh thu nhỏ góc dưới của macOS)", isOn: $settings.instantScreenshotCapture)
                         .toggleStyle(.switch)
                         .font(.system(size: 12))
 
-                    Divider()
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(
-                                screenshotService.isMacOSFloatingThumbnailEnabled
-                                    ? "Mẹo tăng tốc: macOS đang bật 'Xem trước ảnh thu nhỏ góc dưới' (~4s sau khi chụp mới lưu tệp)"
-                                    : "Chế độ Tức thì đang bật: Ảnh chụp màn hình nhảy thẳng vào DropShelf trong 0 giây!"
-                            )
-                            .font(.system(size: 11.5, weight: .medium))
-
-                            Text("Bạn có thể tắt/bật chờ ảnh thu nhỏ góc dưới của macOS để ảnh nhảy vào kệ ngay khoảnh khắc thả chuột.")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Button {
-                            screenshotService.setMacOSFloatingThumbnailEnabled(!screenshotService.isMacOSFloatingThumbnailEnabled)
-                        } label: {
-                            Text(
-                                screenshotService.isMacOSFloatingThumbnailEnabled
-                                    ? "Bật nhảy tức thì (0 giây)"
-                                    : "Khôi phục ảnh góc macOS"
-                            )
-                            .font(.system(size: 11, weight: .semibold))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
+                    Toggle("Tự động bắt cả ảnh chụp màn hình lưu vào Clipboard (⌘⌃⇧3 / ⌘⌃⇧4)", isOn: $settings.autoCaptureClipboardScreenshots)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 12))
                 }
             }
         }

@@ -245,6 +245,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     var isShelfPinned: Bool = false
     var autoCaptureScreenshots: Bool = true
     var autoCaptureClipboardScreenshots: Bool = true
+    var instantScreenshotCapture: Bool = true
     var hotKeyBinding: HotKeyBinding = .defaultToggle
     var customFloatingX: Double? = nil
     var customFloatingY: Double? = nil
@@ -265,6 +266,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         isShelfPinned: Bool = false,
         autoCaptureScreenshots: Bool = true,
         autoCaptureClipboardScreenshots: Bool = true,
+        instantScreenshotCapture: Bool = true,
         hotKeyBinding: HotKeyBinding = .defaultToggle,
         customFloatingX: Double? = nil,
         customFloatingY: Double? = nil
@@ -284,6 +286,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         self.isShelfPinned = isShelfPinned
         self.autoCaptureScreenshots = autoCaptureScreenshots
         self.autoCaptureClipboardScreenshots = autoCaptureClipboardScreenshots
+        self.instantScreenshotCapture = instantScreenshotCapture
         self.hotKeyBinding = hotKeyBinding
         self.customFloatingX = customFloatingX
         self.customFloatingY = customFloatingY
@@ -306,6 +309,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         isShelfPinned = try c.decodeIfPresent(Bool.self, forKey: .isShelfPinned) ?? false
         autoCaptureScreenshots = try c.decodeIfPresent(Bool.self, forKey: .autoCaptureScreenshots) ?? true
         autoCaptureClipboardScreenshots = try c.decodeIfPresent(Bool.self, forKey: .autoCaptureClipboardScreenshots) ?? true
+        instantScreenshotCapture = try c.decodeIfPresent(Bool.self, forKey: .instantScreenshotCapture) ?? true
         hotKeyBinding = try c.decodeIfPresent(HotKeyBinding.self, forKey: .hotKeyBinding) ?? .defaultToggle
         customFloatingX = try c.decodeIfPresent(Double.self, forKey: .customFloatingX)
         customFloatingY = try c.decodeIfPresent(Double.self, forKey: .customFloatingY)
@@ -430,6 +434,14 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var instantScreenshotCapture: Bool {
+        didSet {
+            guard instantScreenshotCapture != oldValue else { return }
+            saveSettingsAsync()
+            ScreenshotMonitorService.shared.applyMacOSInstantScreenshotPreference()
+        }
+    }
+
     @Published var hotKeyBinding: HotKeyBinding {
         didSet {
             guard hotKeyBinding != oldValue else { return }
@@ -489,6 +501,7 @@ final class AppSettings: ObservableObject {
         self.isShelfPinned = loaded.isShelfPinned
         self.autoCaptureScreenshots = loaded.autoCaptureScreenshots
         self.autoCaptureClipboardScreenshots = loaded.autoCaptureClipboardScreenshots
+        self.instantScreenshotCapture = loaded.instantScreenshotCapture
         self.hotKeyBinding = loaded.hotKeyBinding
         self.customFloatingX = loaded.customFloatingX
         self.customFloatingY = loaded.customFloatingY
@@ -557,6 +570,7 @@ final class AppSettings: ObservableObject {
             isShelfPinned: isShelfPinned,
             autoCaptureScreenshots: autoCaptureScreenshots,
             autoCaptureClipboardScreenshots: autoCaptureClipboardScreenshots,
+            instantScreenshotCapture: instantScreenshotCapture,
             hotKeyBinding: hotKeyBinding,
             customFloatingX: customFloatingX,
             customFloatingY: customFloatingY
