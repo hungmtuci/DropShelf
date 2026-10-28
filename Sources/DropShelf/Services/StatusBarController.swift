@@ -95,7 +95,15 @@ final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
-        // Dock Show/Hide Option right on the Menu Bar!
+        let autoScreenshotItem = NSMenuItem(
+            title: "Tự động bắt Ảnh chụp màn hình vào Kệ",
+            action: #selector(toggleAutoScreenshotAction),
+            keyEquivalent: ""
+        )
+        autoScreenshotItem.state = settings.autoCaptureScreenshots ? .on : .off
+        autoScreenshotItem.target = self
+        menu.addItem(autoScreenshotItem)
+
         let showDockItem = NSMenuItem(
             title: "Hiển thị biểu tượng trên thanh Dock",
             action: #selector(toggleShowInDockAction),
@@ -190,6 +198,10 @@ final class StatusBarController: NSObject {
         ShelfStore.shared.clearUnpinnedEntries()
     }
 
+    @objc private func toggleAutoScreenshotAction() {
+        AppSettings.shared.autoCaptureScreenshots.toggle()
+    }
+
     @objc private func toggleShowInDockAction() {
         AppSettings.shared.showInDock.toggle()
     }
@@ -220,8 +232,6 @@ final class StatusBarController: NSObject {
         NSApp.terminate(nil)
     }
 }
-
-// MARK: - Interactive Status Bar View (Supports Left-Click, Right-Click, AND Direct File Drag-Drop!)
 
 private final class StatusBarInteractiveDropView: NSView {
     var onLeftClick: (() -> Void)?

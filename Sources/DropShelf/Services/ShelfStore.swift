@@ -41,7 +41,6 @@ final class ShelfStore: ObservableObject {
               let decoded = try? JSONDecoder().decode([ShelfEntry].self, from: data) else {
             return
         }
-        // Keep entries that still have at least one existing file on disk
         let valid = decoded.compactMap { entry -> ShelfEntry? in
             var copy = entry
             copy.refreshBookmarksAfterMove()
@@ -72,6 +71,54 @@ final class ShelfStore: ObservableObject {
         }
     }
 
+    private func notifyShelfContentMutated() {
+        saveShelfIfNeeded()
+        StatusBarController.shared.refreshBadge()
+        ShelfPanelController.shared.scheduleEmptyAutoHideIfNeeded()
+    }
+
+    // MARK: - Automatic Screenshot Ingestion
+
+    func addCapturedScreenshotFile(_ rawURL: URL) {
+        let url = rawURL.standardizedFileURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+
+        // Avoid duplicating if already present on the shelf
+        let alreadyOnShelf = entries.contains { entry in
+            entry.items.contains { $0.resolvedURL().path == url.path }
+        }
+        guard !alreadyOnShelf else { return }
+
+        let ref = ShelfFileRef(url: url, kind: .screenshot)
+        let entry = ShelfEntry(items: [ref])
+        entries.insert(entry, at: 0)
+        selectedEntryID = entry.id
+        warmThumbnails(for: entry)
+        notifyShelfContentMutated()
+        ShelfPanelController.shared.summonForCapturedScreenshot()
+    }
+
+    func addClipboardScreenshotImage(_ image: NSImage) {
+        guard let pngData = Self.pngData(from: image) else { return }
+        let stamp = Self.timestampToken()
+        let readableTime = Self.humanTimeToken()
+        guard let ref = createTemporarySnippetFile(
+            data: pngData,
+            fileName: "Anh-chup-man-hinh-\(stamp).png",
+            kind: .screenshot,
+            customTitle: "Ảnh chụp \(readableTime) (\(Int(image.size.width))×\(Int(image.size.height)))"
+        ) else {
+            return
+        }
+
+        let entry = ShelfEntry(items: [ref])
+        entries.insert(entry, at: 0)
+        selectedEntryID = entry.id
+        warmThumbnails(for: entry)
+        notifyShelfContentMutated()
+        ShelfPanelController.shared.summonForCapturedScreenshot()
+    }
+
     // MARK: - Adding Files & Pasteboard Content
 
     @discardableResult
@@ -100,8 +147,7 @@ final class ShelfStore: ObservableObject {
                 entries[idx].items.append(contentsOf: newUnique)
                 selectedEntryID = entries[idx].id
                 warmThumbnails(for: entries[idx])
-                saveShelfIfNeeded()
-                StatusBarController.shared.refreshBadge()
+                notifyShelfContentMutated()
             }
             return true
         }
@@ -120,14 +166,13 @@ final class ShelfStore: ObservableObject {
             }
         }
 
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
         return true
     }
 
     @discardableResult
     func ingestPasteboard(_ pasteboard: NSPasteboard, mergeIntoEntryID: UUID? = nil) -> Bool {
-        // 1. Native File URLs (Finder files/folders, dragged downloads, etc.)
+        // 1. Native File URLs
         if let fileURLs = pasteboard.readObjects(
             forClasses: [NSURL.self],
             options: [.urlReadingFileURLsOnly: true]
@@ -135,7 +180,7 @@ final class ShelfStore: ObservableObject {
             return addFileURLs(fileURLs, mergeIntoEntryID: mergeIntoEntryID)
         }
 
-        // 2. Images (Screenshots from Clipboard, Web images from Safari/Chrome, Preview selections)
+        // 2. Images
         if let image = NSImage(pasteboard: pasteboard),
            let pngData = Self.pngData(from: image) {
             if let snippetRef = createTemporarySnippetFile(
@@ -149,7 +194,7 @@ final class ShelfStore: ObservableObject {
             }
         }
 
-        // 3. Web URLs (http / https dragged from browser address bar or links)
+        // 3. Web URLs
         if let urls = pasteboard.readObjects(
             forClasses: [NSURL.self],
             options: [.urlReadingFileURLsOnly: false]
@@ -178,7 +223,6 @@ final class ShelfStore: ObservableObject {
         if let rawText = pasteboard.string(forType: .string) {
             let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
-                // Check if text itself is a clean URL
                 if let detectedURL = URL(string: trimmed),
                    (detectedURL.scheme == "http" || detectedURL.scheme == "https"),
                    !trimmed.contains(" "), !trimmed.contains("\n") {
@@ -246,8 +290,7 @@ final class ShelfStore: ObservableObject {
             selectedEntryID = entry.id
             warmThumbnails(for: entry)
         }
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
     }
 
     private func createTemporarySnippetFile(
@@ -307,8 +350,7 @@ final class ShelfStore: ObservableObject {
         }
 
         scheduleCleanupForRemovedSnippets(removedRefs, delaySeconds: 30)
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
 
         if entries.isEmpty && !AppSettings.shared.isShelfPinned {
             ShelfPanelController.shared.dismissAfterLastItemDraggedOut()
@@ -335,8 +377,7 @@ final class ShelfStore: ObservableObject {
             selectedEntryID = entries.first?.id
         }
         scheduleCleanupForRemovedSnippets(removed.items, delaySeconds: 5)
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
         ShelfPanelController.shared.resizePanelToFitContent(animated: true)
     }
 
@@ -353,8 +394,7 @@ final class ShelfStore: ObservableObject {
             expandedStackID = nil
         }
         scheduleCleanupForRemovedSnippets(removedItems, delaySeconds: 5)
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
         ShelfPanelController.shared.resizePanelToFitContent(animated: true)
     }
 
@@ -371,8 +411,7 @@ final class ShelfStore: ObservableObject {
         for single in singles {
             warmThumbnails(for: single)
         }
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
         ShelfPanelController.shared.resizePanelToFitContent(animated: true)
     }
 
@@ -389,8 +428,7 @@ final class ShelfStore: ObservableObject {
         expandedStackID = nil
         selectedEntryID = merged.id
         warmThumbnails(for: merged)
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
         ShelfPanelController.shared.resizePanelToFitContent(animated: true)
     }
 
@@ -401,8 +439,7 @@ final class ShelfStore: ObservableObject {
         selectedEntryID = entries.first?.id
         let refs = removed.flatMap(\.items)
         scheduleCleanupForRemovedSnippets(refs, delaySeconds: 5)
-        saveShelfIfNeeded()
-        StatusBarController.shared.refreshBadge()
+        notifyShelfContentMutated()
         ShelfPanelController.shared.resizePanelToFitContent(animated: true)
     }
 
@@ -434,6 +471,7 @@ final class ShelfStore: ObservableObject {
         if !urls.isEmpty {
             pb.writeObjects(urls)
         }
+        ScreenshotMonitorService.shared.markInternalClipboardWrite()
     }
 
     func createDemoSampleItems() {
@@ -491,7 +529,6 @@ final class ShelfStore: ObservableObject {
             let path = url.path
             guard thumbnails[path] == nil, FileManager.default.fileExists(atPath: path) else { continue }
 
-            // Seed immediately with native Finder icon so there is never an empty frame
             let fallbackIcon = NSWorkspace.shared.icon(forFile: path)
             fallbackIcon.size = NSSize(width: 48, height: 48)
             thumbnails[path] = fallbackIcon
@@ -516,6 +553,12 @@ final class ShelfStore: ObservableObject {
     private static func timestampToken() -> String {
         let fmt = DateFormatter()
         fmt.dateFormat = "HHmmss"
+        return fmt.string(from: Date())
+    }
+
+    private static func humanTimeToken() -> String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm:ss"
         return fmt.string(from: Date())
     }
 

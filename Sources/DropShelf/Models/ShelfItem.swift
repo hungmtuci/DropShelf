@@ -4,6 +4,7 @@ import AppKit
 enum ShelfItemKind: String, Codable, Sendable {
     case file
     case folder
+    case screenshot
     case imageSnippet
     case textSnippet
     case urlSnippet
@@ -12,6 +13,7 @@ enum ShelfItemKind: String, Codable, Sendable {
         switch self {
         case .file: return nil
         case .folder: return "Thư mục"
+        case .screenshot: return "Ảnh chụp"
         case .imageSnippet: return "Ảnh tạm"
         case .textSnippet: return "Văn bản"
         case .urlSnippet: return "Liên kết"
@@ -108,7 +110,6 @@ struct ShelfFileRef: Identifiable, Codable, Equatable, Sendable {
             }
             return 0
         }
-        // Lightweight shallow folder size estimate (avoid deep traversal blocking)
         guard let children = try? FileManager.default.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: [.fileSizeKey],
@@ -185,6 +186,11 @@ struct ShelfEntry: Identifiable, Codable, Equatable, Sendable {
         switch only.kind {
         case .folder:
             return sizeStr.isEmpty ? "Thư mục • \(only.parentFolderName)" : "Thư mục • \(sizeStr)"
+        case .screenshot:
+            if only.isTemporarySnippet {
+                return sizeStr.isEmpty ? "Clipboard Screenshot" : "Clipboard • \(sizeStr)"
+            }
+            return sizeStr.isEmpty ? only.parentFolderName : "\(sizeStr) • \(only.parentFolderName)"
         case .imageSnippet:
             return sizeStr.isEmpty ? "Ảnh chụp / Web tạm" : "Ảnh tạm • \(sizeStr)"
         case .textSnippet:

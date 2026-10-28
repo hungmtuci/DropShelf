@@ -78,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         quitItem.target = self
         appMenuItem.submenu = appMenu
 
-        // File / Shelf Menu
+        // Shelf Menu
         let shelfMenuItem = NSMenuItem()
         mainMenu.addItem(shelfMenuItem)
         let shelfMenu = NSMenu(title: "Kệ tạm")
@@ -107,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         clearShelf.target = self
         shelfMenuItem.submenu = shelfMenu
 
-        // Edit Menu (supports Cmd+A / Cmd+C / Cmd+V in standard controls)
+        // Edit Menu
         let editMenuItem = NSMenuItem()
         mainMenu.addItem(editMenuItem)
         let editMenu = NSMenu(title: "Chỉnh sửa")
@@ -136,7 +136,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
 
-        // Prevent duplicate running instances
         if let bundleID = Bundle.main.bundleIdentifier {
             let ownPID = ProcessInfo.processInfo.processIdentifier
             let existing = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
@@ -154,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let statusBar = StatusBarController.shared
         let hotKeys = HotKeyService.shared
         let dragMonitor = DragMonitorService.shared
+        let screenshotMonitor = ScreenshotMonitorService.shared
 
         _ = store
         settings.applyDockVisibilityPolicy()
@@ -167,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         hotKeys.installHandlerAndRegister(binding: settings.hotKeyBinding)
 
         dragMonitor.start()
+        screenshotMonitor.start()
 
         if settings.openSettingsOnLaunch {
             showSettingsWindow()
@@ -177,7 +178,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    /// Supports dragging and dropping files directly onto the DropShelf icon in the macOS Dock!
     func application(_ application: NSApplication, open urls: [URL]) {
         let added = ShelfStore.shared.addFileURLs(urls)
         if added {
@@ -194,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        ScreenshotMonitorService.shared.stop()
         DragMonitorService.shared.stop()
         HotKeyService.shared.unregister()
         ShelfStore.shared.saveShelfIfNeeded()
@@ -210,6 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 store: ShelfStore.shared,
                 panelController: ShelfPanelController.shared,
                 hotKeyService: HotKeyService.shared,
+                screenshotService: ScreenshotMonitorService.shared,
                 updateService: UpdateCheckerService.shared
             )
             let hosting = NSHostingController(rootView: rootView)
@@ -218,7 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             win.isReleasedWhenClosed = false
             win.delegate = self
-            win.setContentSize(NSSize(width: 820, height: 700))
+            win.setContentSize(NSSize(width: 820, height: 730))
             win.center()
             self.settingsWindow = win
         }

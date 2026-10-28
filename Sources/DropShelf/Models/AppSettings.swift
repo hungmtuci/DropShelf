@@ -66,11 +66,31 @@ enum AutoShowTrigger: String, Codable, CaseIterable, Identifiable, Sendable {
     var shortNote: String {
         switch self {
         case .immediateOnDrag:
-            return "Tự động trượt ra mỗi khi phát hiện thao tác kéo thực sự và tự đóng nếu bạn không thả vào kệ."
+            return "Tự động trượt ra mỗi khi phát hiện thao tác kéo thực sự và tự ẩn sau 3s nếu không có nội dung."
         case .edgeOrShake:
             return "Giữ màn hình thoáng tối đa — chỉ trượt ra khi rê tệp lại gần cạnh kệ hoặc lắc nhẹ con trỏ chuột."
         case .manualOnly:
             return "Không tự bật khi kéo chuột; mở kệ bằng phím tắt toàn cục hoặc bấm icon trên Menu Bar."
+        }
+    }
+}
+
+enum EmptyAutoHideOption: Int, Codable, CaseIterable, Identifiable, Sendable {
+    case twoSeconds = 2
+    case threeSeconds = 3
+    case fiveSeconds = 5
+    case eightSeconds = 8
+    case disabled = 0
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .twoSeconds: return "2 giây"
+        case .threeSeconds: return "3 giây (Mặc định)"
+        case .fiveSeconds: return "5 giây"
+        case .eightSeconds: return "8 giây"
+        case .disabled: return "Không tự ẩn"
         }
     }
 }
@@ -127,7 +147,6 @@ struct HotKeyBinding: Codable, Equatable, Sendable {
     var keyCode: UInt32
     var carbonModifiers: UInt32
 
-    /// Default: `Ctrl + Y` (`⌃Y`) — inspired by Yoink, avoids conflicting with `⌘⇧D` (QuickFolder) & `⌃B` (BarFlow).
     static let defaultToggle = HotKeyBinding(
         keyCode: UInt32(kVK_ANSI_Y),
         carbonModifiers: UInt32(controlKey)
@@ -216,6 +235,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     var openSettingsOnLaunch: Bool = true
     var edgePosition: ShelfEdgePosition = .rightCenter
     var autoShowTrigger: AutoShowTrigger = .immediateOnDrag
+    var emptyAutoHideOption: EmptyAutoHideOption = .threeSeconds
     var dragOutBehavior: DragOutBehavior = .moveLikeFinder
     var autoRemoveAfterDrop: Bool = true
     var autoStackMultipleFiles: Bool = true
@@ -223,9 +243,73 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     var showEdgeHandle: Bool = true
     var shelfSize: ShelfSizePreset = .standard
     var isShelfPinned: Bool = false
+    var autoCaptureScreenshots: Bool = true
+    var autoCaptureClipboardScreenshots: Bool = true
     var hotKeyBinding: HotKeyBinding = .defaultToggle
     var customFloatingX: Double? = nil
     var customFloatingY: Double? = nil
+
+    init(
+        initialized: Bool = true,
+        showInDock: Bool = true,
+        openSettingsOnLaunch: Bool = true,
+        edgePosition: ShelfEdgePosition = .rightCenter,
+        autoShowTrigger: AutoShowTrigger = .immediateOnDrag,
+        emptyAutoHideOption: EmptyAutoHideOption = .threeSeconds,
+        dragOutBehavior: DragOutBehavior = .moveLikeFinder,
+        autoRemoveAfterDrop: Bool = true,
+        autoStackMultipleFiles: Bool = true,
+        persistItemsAcrossLaunches: Bool = true,
+        showEdgeHandle: Bool = true,
+        shelfSize: ShelfSizePreset = .standard,
+        isShelfPinned: Bool = false,
+        autoCaptureScreenshots: Bool = true,
+        autoCaptureClipboardScreenshots: Bool = true,
+        hotKeyBinding: HotKeyBinding = .defaultToggle,
+        customFloatingX: Double? = nil,
+        customFloatingY: Double? = nil
+    ) {
+        self.initialized = initialized
+        self.showInDock = showInDock
+        self.openSettingsOnLaunch = openSettingsOnLaunch
+        self.edgePosition = edgePosition
+        self.autoShowTrigger = autoShowTrigger
+        self.emptyAutoHideOption = emptyAutoHideOption
+        self.dragOutBehavior = dragOutBehavior
+        self.autoRemoveAfterDrop = autoRemoveAfterDrop
+        self.autoStackMultipleFiles = autoStackMultipleFiles
+        self.persistItemsAcrossLaunches = persistItemsAcrossLaunches
+        self.showEdgeHandle = showEdgeHandle
+        self.shelfSize = shelfSize
+        self.isShelfPinned = isShelfPinned
+        self.autoCaptureScreenshots = autoCaptureScreenshots
+        self.autoCaptureClipboardScreenshots = autoCaptureClipboardScreenshots
+        self.hotKeyBinding = hotKeyBinding
+        self.customFloatingX = customFloatingX
+        self.customFloatingY = customFloatingY
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        initialized = try c.decodeIfPresent(Bool.self, forKey: .initialized) ?? true
+        showInDock = try c.decodeIfPresent(Bool.self, forKey: .showInDock) ?? true
+        openSettingsOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .openSettingsOnLaunch) ?? true
+        edgePosition = try c.decodeIfPresent(ShelfEdgePosition.self, forKey: .edgePosition) ?? .rightCenter
+        autoShowTrigger = try c.decodeIfPresent(AutoShowTrigger.self, forKey: .autoShowTrigger) ?? .immediateOnDrag
+        emptyAutoHideOption = try c.decodeIfPresent(EmptyAutoHideOption.self, forKey: .emptyAutoHideOption) ?? .threeSeconds
+        dragOutBehavior = try c.decodeIfPresent(DragOutBehavior.self, forKey: .dragOutBehavior) ?? .moveLikeFinder
+        autoRemoveAfterDrop = try c.decodeIfPresent(Bool.self, forKey: .autoRemoveAfterDrop) ?? true
+        autoStackMultipleFiles = try c.decodeIfPresent(Bool.self, forKey: .autoStackMultipleFiles) ?? true
+        persistItemsAcrossLaunches = try c.decodeIfPresent(Bool.self, forKey: .persistItemsAcrossLaunches) ?? true
+        showEdgeHandle = try c.decodeIfPresent(Bool.self, forKey: .showEdgeHandle) ?? true
+        shelfSize = try c.decodeIfPresent(ShelfSizePreset.self, forKey: .shelfSize) ?? .standard
+        isShelfPinned = try c.decodeIfPresent(Bool.self, forKey: .isShelfPinned) ?? false
+        autoCaptureScreenshots = try c.decodeIfPresent(Bool.self, forKey: .autoCaptureScreenshots) ?? true
+        autoCaptureClipboardScreenshots = try c.decodeIfPresent(Bool.self, forKey: .autoCaptureClipboardScreenshots) ?? true
+        hotKeyBinding = try c.decodeIfPresent(HotKeyBinding.self, forKey: .hotKeyBinding) ?? .defaultToggle
+        customFloatingX = try c.decodeIfPresent(Double.self, forKey: .customFloatingX)
+        customFloatingY = try c.decodeIfPresent(Double.self, forKey: .customFloatingY)
+    }
 }
 
 @MainActor
@@ -266,6 +350,14 @@ final class AppSettings: ObservableObject {
         didSet {
             guard autoShowTrigger != oldValue else { return }
             saveSettingsAsync()
+        }
+    }
+
+    @Published var emptyAutoHideOption: EmptyAutoHideOption {
+        didSet {
+            guard emptyAutoHideOption != oldValue else { return }
+            saveSettingsAsync()
+            onEmptyAutoHideChanged?()
         }
     }
 
@@ -322,6 +414,22 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var autoCaptureScreenshots: Bool {
+        didSet {
+            guard autoCaptureScreenshots != oldValue else { return }
+            saveSettingsAsync()
+            ScreenshotMonitorService.shared.syncMonitoringState()
+        }
+    }
+
+    @Published var autoCaptureClipboardScreenshots: Bool {
+        didSet {
+            guard autoCaptureClipboardScreenshots != oldValue else { return }
+            saveSettingsAsync()
+            ScreenshotMonitorService.shared.syncMonitoringState()
+        }
+    }
+
     @Published var hotKeyBinding: HotKeyBinding {
         didSet {
             guard hotKeyBinding != oldValue else { return }
@@ -338,6 +446,7 @@ final class AppSettings: ObservableObject {
     var onLayoutPreferenceChanged: (() -> Void)?
     var onEdgeHandlePreferenceChanged: (() -> Void)?
     var onPinStateChanged: (() -> Void)?
+    var onEmptyAutoHideChanged: (() -> Void)?
 
     private var isSyncingLaunchAtLogin = false
     private let settingsFileURL: URL
@@ -370,6 +479,7 @@ final class AppSettings: ObservableObject {
         self.openSettingsOnLaunch = loaded.openSettingsOnLaunch
         self.edgePosition = loaded.edgePosition
         self.autoShowTrigger = loaded.autoShowTrigger
+        self.emptyAutoHideOption = loaded.emptyAutoHideOption
         self.dragOutBehavior = loaded.dragOutBehavior
         self.autoRemoveAfterDrop = loaded.autoRemoveAfterDrop
         self.autoStackMultipleFiles = loaded.autoStackMultipleFiles
@@ -377,6 +487,8 @@ final class AppSettings: ObservableObject {
         self.showEdgeHandle = loaded.showEdgeHandle
         self.shelfSize = loaded.shelfSize
         self.isShelfPinned = loaded.isShelfPinned
+        self.autoCaptureScreenshots = loaded.autoCaptureScreenshots
+        self.autoCaptureClipboardScreenshots = loaded.autoCaptureClipboardScreenshots
         self.hotKeyBinding = loaded.hotKeyBinding
         self.customFloatingX = loaded.customFloatingX
         self.customFloatingY = loaded.customFloatingY
@@ -435,6 +547,7 @@ final class AppSettings: ObservableObject {
             openSettingsOnLaunch: openSettingsOnLaunch,
             edgePosition: edgePosition,
             autoShowTrigger: autoShowTrigger,
+            emptyAutoHideOption: emptyAutoHideOption,
             dragOutBehavior: dragOutBehavior,
             autoRemoveAfterDrop: autoRemoveAfterDrop,
             autoStackMultipleFiles: autoStackMultipleFiles,
@@ -442,6 +555,8 @@ final class AppSettings: ObservableObject {
             showEdgeHandle: showEdgeHandle,
             shelfSize: shelfSize,
             isShelfPinned: isShelfPinned,
+            autoCaptureScreenshots: autoCaptureScreenshots,
+            autoCaptureClipboardScreenshots: autoCaptureClipboardScreenshots,
             hotKeyBinding: hotKeyBinding,
             customFloatingX: customFloatingX,
             customFloatingY: customFloatingY

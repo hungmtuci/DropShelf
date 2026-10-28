@@ -19,6 +19,7 @@ final class ShelfPanelController: ObservableObject {
     private var wasSummonedByDrag: Bool = false
     private var didReceiveDropDuringCurrentSummon: Bool = false
     private var activeScreen: NSScreen?
+    private var emptyAutoHideTimer: Timer?
 
     private init() {}
 
@@ -47,10 +48,17 @@ final class ShelfPanelController: ObservableObject {
         let dropContainer = ShelfRootDropContainerView(frame: initialRect)
         dropContainer.autoresizingMask = [.width, .height]
         dropContainer.onDragTargetedChanged = { [weak self] targeted in
-            self?.isIncomingDragTargeted = targeted
+            guard let self else { return }
+            self.isIncomingDragTargeted = targeted
+            if targeted {
+                self.cancelEmptyAutoHideTimer()
+            } else {
+                self.scheduleEmptyAutoHideIfNeeded()
+            }
         }
         dropContainer.onDropCompleted = { [weak self] in
             self?.resizePanelToFitContent(animated: true)
+            self?.scheduleEmptyAutoHideIfNeeded()
         }
 
         let hosting = NSHostingView(
@@ -67,7 +75,6 @@ final class ShelfPanelController: ObservableObject {
         panel.contentView = dropContainer
         self.shelfPanel = panel
 
-        // Observe window moves in freeFloating mode
         NotificationCenter.default.addObserver(
             forName: NSWindow.didMoveNotification,
             object: panel,
@@ -98,9 +105,17 @@ final class ShelfPanelController: ObservableObject {
         }
         AppSettings.shared.onPinStateChanged = { [weak self] in
             guard let self else { return }
-            if AppSettings.shared.isShelfPinned && !self.isVisible {
-                self.showShelfManually()
+            if AppSettings.shared.isShelfPinned {
+                self.cancelEmptyAutoHideTimer()
+                if !self.isVisible {
+                    self.showShelfManually()
+                }
+            } else {
+                self.scheduleEmptyAutoHideIfNeeded()
             }
+        }
+        AppSettings.shared.onEmptyAutoHideChanged = { [weak self] in
+            self?.scheduleEmptyAutoHideIfNeeded()
         }
 
         if AppSettings.shared.isShelfPinned || !ShelfStore.shared.entries.isEmpty {
@@ -129,7 +144,7 @@ final class ShelfPanelController: ObservableObject {
         let handleView = EdgeHandleTriggerNSView(frame: handleRect)
         handleView.autoresizingMask = [.width, .height]
         handleView.onActivateShelf = { [weak self] in
-            self?.showShelfManually()
+            self?.showShelfFromEdgeTrigger()
         }
         hp.contentView = handleView
         self.edgeHandlePanel = hp
@@ -149,6 +164,22 @@ final class ShelfPanelController: ObservableObject {
         wasSummonedByDrag = false
         didReceiveDropDuringCurrentSummon = false
         presentShelf(near: NSEvent.mouseLocation)
+        scheduleEmptyAutoHideIfNeeded()
+    }
+
+    func showShelfFromEdgeTrigger() {
+        wasSummonedByDrag = false
+        didReceiveDropDuringCurrentSummon = false
+        presentShelf(near: NSEvent.mouseLocation)
+        scheduleEmptyAutoHideIfNeeded()
+    }
+
+    func summonForCapturedScreenshot() {
+        wasSummonedByDrag = false
+        didReceiveDropDuringCurrentSummon = true
+        cancelEmptyAutoHideTimer()
+        presentShelf(near: NSEvent.mouseLocation)
+        resizePanelToFitContent(animated: true)
     }
 
     func summonForIncomingDrag(at mousePoint: NSPoint) {
@@ -159,16 +190,17 @@ final class ShelfPanelController: ObservableObject {
         } else {
             ensureFront()
         }
+        scheduleEmptyAutoHideIfNeeded()
     }
 
     func markDropReceived() {
         didReceiveDropDuringCurrentSummon = true
         wasSummonedByDrag = false
+        cancelEmptyAutoHideTimer()
     }
 
     func handleGlobalMouseUpAfterDrag() {
-        guard isVisible, wasSummonedByDrag else { return }
-        // Allow performDragOperation to complete first if the user dropped right onto DropShelf
+        guard isVisible else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak self] in
             guard let self else { return }
             if self.wasSummonedByDrag
@@ -176,6 +208,8 @@ final class ShelfPanelController: ObservableObject {
                 && ShelfStore.shared.entries.isEmpty
                 && !AppSettings.shared.isShelfPinned {
                 self.hideShelf()
+            } else {
+                self.scheduleEmptyAutoHideIfNeeded()
             }
         }
     }
@@ -185,6 +219,48 @@ final class ShelfPanelController: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
             guard let self else { return }
             if ShelfStore.shared.entries.isEmpty && !AppSettings.shared.isShelfPinned {
+                self.hideShelf()
+            }
+        }
+    }
+
+    // MARK: - 3-Second Empty Shelf Auto-Hide Watchdog
+
+    func cancelEmptyAutoHideTimer() {
+        emptyAutoHideTimer?.invalidate()
+        emptyAutoHideTimer = nil
+    }
+
+    func scheduleEmptyAutoHideIfNeeded() {
+        cancelEmptyAutoHideTimer()
+
+        guard isVisible,
+              ShelfStore.shared.entries.isEmpty,
+              !AppSettings.shared.isShelfPinned else {
+            return
+        }
+
+        let seconds = AppSettings.shared.emptyAutoHideOption.rawValue
+        guard seconds > 0 else { return }
+
+        scheduleEmptyTimer(after: TimeInterval(seconds))
+    }
+
+    private func scheduleEmptyTimer(after interval: TimeInterval) {
+        cancelEmptyAutoHideTimer()
+        emptyAutoHideTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                guard self.isVisible,
+                      ShelfStore.shared.entries.isEmpty,
+                      !AppSettings.shared.isShelfPinned else {
+                    return
+                }
+                // Never close right under an active system drag-and-drop gesture
+                if self.isIncomingDragTargeted || DragMonitorService.shared.isSystemDragActive {
+                    self.scheduleEmptyTimer(after: 1.0)
+                    return
+                }
                 self.hideShelf()
             }
         }
@@ -226,6 +302,7 @@ final class ShelfPanelController: ObservableObject {
     }
 
     func hideShelf() {
+        cancelEmptyAutoHideTimer()
         guard let panel = shelfPanel, panel.isVisible else { return }
         wasSummonedByDrag = false
         isIncomingDragTargeted = false
@@ -383,6 +460,7 @@ private final class EdgeHandleTriggerNSView: NSView {
         didSet { needsDisplay = true }
     }
     private var trackingRef: NSTrackingArea?
+    private var hoverOpenWorkItem: DispatchWorkItem?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -410,18 +488,31 @@ private final class EdgeHandleTriggerNSView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         isHovered = true
+        hoverOpenWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.isHovered else { return }
+            MainActor.assumeIsolated {
+                self.onActivateShelf?()
+            }
+        }
+        hoverOpenWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovered = false
+        hoverOpenWorkItem?.cancel()
+        hoverOpenWorkItem = nil
     }
 
     override func mouseDown(with event: NSEvent) {
+        hoverOpenWorkItem?.cancel()
         MainActor.assumeIsolated { onActivateShelf?() }
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard !ShelfStore.shared.isDraggingOutFromShelf else { return [] }
+        hoverOpenWorkItem?.cancel()
         MainActor.assumeIsolated { onActivateShelf?() }
         return .generic
     }

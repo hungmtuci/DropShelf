@@ -88,7 +88,6 @@ struct ShelfPanelView: View {
 
             Spacer(minLength: 4)
 
-            // Paste from Clipboard
             Button {
                 if !store.addFromGeneralClipboard() {
                     NSSound.beep()
@@ -102,7 +101,6 @@ struct ShelfPanelView: View {
             .foregroundStyle(.secondary)
             .help("Dán tệp / ảnh / văn bản từ Clipboard (⌘V)")
 
-            // Pin / Lock Shelf
             Button {
                 settings.isShelfPinned.toggle()
             } label: {
@@ -112,9 +110,8 @@ struct ShelfPanelView: View {
                     .foregroundStyle(settings.isShelfPinned ? Color.orange : Color.secondary)
             }
             .buttonStyle(.plain)
-            .help(settings.isShelfPinned ? "Đang ghim kệ luôn hiển thị (Nhấn để bỏ ghim)" : "Ghim kệ luôn hiển thị trên màn hình")
+            .help(settings.isShelfPinned ? "Đang ghim kệ luôn hiển thị (Nhấn để bỏ ghim)" : "Ghim kệ luôn hiển thị (không tự ẩn khi trống)")
 
-            // Clear Unpinned
             if !store.entries.isEmpty {
                 Button {
                     store.clearUnpinnedEntries()
@@ -128,7 +125,6 @@ struct ShelfPanelView: View {
                 .help("Dọn sạch kệ tạm (Không xoá tệp gốc trên máy)")
             }
 
-            // Open Settings
             Button {
                 AppDelegate.shared?.showSettingsWindow()
             } label: {
@@ -140,7 +136,6 @@ struct ShelfPanelView: View {
             .foregroundStyle(.secondary)
             .help("Mở Cài đặt & Tuỳ chọn (⌘,)")
 
-            // Hide Shelf
             Button {
                 panelController.hideShelf()
             } label: {
@@ -161,25 +156,35 @@ struct ShelfPanelView: View {
         let isEmpty = store.entries.isEmpty
         let targeted = panelController.isIncomingDragTargeted
 
-        return VStack(spacing: isEmpty ? 8 : 4) {
+        return VStack(spacing: isEmpty ? 7 : 4) {
             Image(systemName: targeted ? "arrow.down.doc.fill" : "plus.viewfinder")
-                .font(.system(size: isEmpty ? 26 : 15, weight: .semibold))
+                .font(.system(size: isEmpty ? 25 : 15, weight: .semibold))
                 .foregroundStyle(targeted ? Color.accentColor : Color.secondary)
 
-            Text(targeted ? "Thả vào đây để giữ trên kệ!" : (isEmpty ? "Kéo thả tệp vào đây" : "Thả thêm tệp mới vào kệ"))
-                .font(.system(size: isEmpty ? 13 : 11.5, weight: .semibold))
+            Text(targeted ? "Thả vào đây để giữ trên kệ!" : (isEmpty ? "Kéo thả tệp hoặc chụp màn hình" : "Thả thêm tệp mới vào kệ"))
+                .font(.system(size: isEmpty ? 12.5 : 11.5, weight: .semibold))
                 .foregroundStyle(targeted ? Color.accentColor : Color.primary)
 
             if isEmpty {
-                Text("Hỗ trợ tệp, thư mục, nhiều tệp (Stack),\nhình ảnh web, liên kết & đoạn văn bản")
-                    .font(.system(size: 11))
+                Text("Ảnh chụp màn hình tự nhảy vào đây.\nHỗ trợ tệp, thư mục, Stack, ảnh & văn bản.")
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(2)
+                    .lineSpacing(1.5)
+
+                if !settings.isShelfPinned && settings.emptyAutoHideOption != .disabled {
+                    Text("Tự ẩn sau \(settings.emptyAutoHideOption.rawValue)s nếu trống")
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Color.primary.opacity(0.06))
+                        .foregroundStyle(.secondary)
+                        .clipShape(Capsule())
+                }
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: isEmpty ? 148 : 48)
+        .frame(height: isEmpty ? 152 : 48)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(targeted ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.04))
@@ -365,7 +370,6 @@ private struct ShelfEntryCardView: View {
 
     var body: some View {
         ZStack {
-            // 1. Visual Card + AppKit Outgoing Drag Source Overlay
             HStack(spacing: 10) {
                 thumbnailView
 
@@ -383,13 +387,16 @@ private struct ShelfEntryCardView: View {
                     }
 
                     HStack(spacing: 5) {
-                        if let badge = entry.primaryItem?.kind.badgeLabel, !entry.isStack {
+                        if let kind = entry.primaryItem?.kind,
+                           let badge = kind.badgeLabel,
+                           !entry.isStack {
+                            let badgeColor: Color = (kind == .screenshot) ? .teal : .indigo
                             Text(badge)
                                 .font(.system(size: 9, weight: .semibold))
                                 .padding(.horizontal, 4.5)
                                 .padding(.vertical, 1)
-                                .background(Color.indigo.opacity(0.16))
-                                .foregroundStyle(Color.indigo)
+                                .background(badgeColor.opacity(0.18))
+                                .foregroundStyle(badgeColor)
                                 .clipShape(Capsule())
                         }
                         Text(entry.subtitleText)
@@ -427,11 +434,9 @@ private struct ShelfEntryCardView: View {
                 )
             )
             .overlay(
-                // Allow dropping another dragged file directly onto this card to merge into a Stack!
                 StackMergeDropZoneRepresentable(targetEntryID: entry.id)
             )
 
-            // 2. Quick Hover Action Buttons (Top Z-Layer so clicks trigger cleanly)
             if isHovered && !isIncomingDragActive {
                 HStack(spacing: 3) {
                     Spacer()

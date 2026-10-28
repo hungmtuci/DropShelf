@@ -5,6 +5,8 @@ import AppKit
 final class DragMonitorService {
     static let shared = DragMonitorService()
 
+    private(set) var isSystemDragActive: Bool = false
+
     private var globalMouseMonitor: Any?
     private var localKeyMonitor: Any?
 
@@ -85,6 +87,7 @@ final class DragMonitorService {
         switch type {
         case .leftMouseDown:
             mouseDownPoint = mouseLocation
+            isSystemDragActive = false
             resetShakeState()
             if !ShelfStore.shared.isDraggingOutFromShelf {
                 lastHandledDragChangeCount = NSPasteboard(name: .drag).changeCount
@@ -92,12 +95,15 @@ final class DragMonitorService {
 
         case .leftMouseDragged:
             guard !ShelfStore.shared.isDraggingOutFromShelf else { return }
-            let triggerMode = AppSettings.shared.autoShowTrigger
-            guard triggerMode != .manualOnly else { return }
-
             let dragPB = NSPasteboard(name: .drag)
             let currentCount = dragPB.changeCount
-            // Only react when macOS has actually started a system Drag-and-Drop session
+
+            if currentCount != lastHandledDragChangeCount {
+                isSystemDragActive = true
+            }
+
+            let triggerMode = AppSettings.shared.autoShowTrigger
+            guard triggerMode != .manualOnly else { return }
             guard currentCount != lastHandledDragChangeCount else { return }
 
             if let start = mouseDownPoint {
@@ -122,6 +128,7 @@ final class DragMonitorService {
 
         case .leftMouseUp:
             mouseDownPoint = nil
+            isSystemDragActive = false
             resetShakeState()
             lastHandledDragChangeCount = NSPasteboard(name: .drag).changeCount
             ShelfPanelController.shared.handleGlobalMouseUpAfterDrag()
@@ -151,7 +158,6 @@ final class DragMonitorService {
         } else if pos.isRightEdge {
             return (vf.maxX - mouse.x) <= threshold
         } else {
-            // Free floating: near either left or right screen edge
             return (mouse.x - vf.minX) <= threshold || (vf.maxX - mouse.x) <= threshold
         }
     }

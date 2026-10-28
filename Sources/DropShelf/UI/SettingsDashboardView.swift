@@ -6,6 +6,7 @@ struct SettingsDashboardView: View {
     @ObservedObject var store: ShelfStore
     @ObservedObject var panelController: ShelfPanelController
     @ObservedObject var hotKeyService: HotKeyService
+    @ObservedObject var screenshotService: ScreenshotMonitorService
     @ObservedObject var updateService: UpdateCheckerService
 
     var body: some View {
@@ -21,6 +22,8 @@ struct SettingsDashboardView: View {
                     statusBanner
                 }
 
+                screenshotAutoCaptureSection
+
                 dockAndStartupSection
 
                 positionAndAutoTriggerSection
@@ -31,7 +34,7 @@ struct SettingsDashboardView: View {
             }
             .padding(22)
         }
-        .frame(minWidth: 740, minHeight: 650)
+        .frame(minWidth: 740, minHeight: 680)
     }
 
     // MARK: - 1. Hero Card
@@ -68,7 +71,7 @@ struct SettingsDashboardView: View {
                         .foregroundStyle(Color.accentColor)
                         .clipShape(Capsule())
 
-                    Text(panelController.isVisible ? "Kệ đang mở" : "Tự trượt khi kéo tệp")
+                    Text(panelController.isVisible ? "Kệ đang mở" : "Tự trượt khi kéo tệp / chụp màn hình")
                         .font(.system(size: 10.5, weight: .semibold))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2)
@@ -77,7 +80,7 @@ struct SettingsDashboardView: View {
                         .clipShape(Capsule())
                 }
 
-                Text("Kệ tạm thời lấy cảm hứng từ Yoink — kéo thả tệp, thư mục, ảnh hoặc văn bản vào cạnh màn hình để rảnh tay di chuyển sang cửa sổ / màn hình mới.")
+                Text("Kệ tạm thời lấy cảm hứng từ Yoink — kéo thả tệp vào cạnh màn hình, tự động gom ảnh chụp màn hình mới và tự ẩn gọn sau 3 giây khi trống.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -233,7 +236,74 @@ struct SettingsDashboardView: View {
         )
     }
 
-    // MARK: - 2. Dock Visibility & Startup Section
+    // MARK: - 2. Automatic Screenshot Capture Section
+
+    private var screenshotAutoCaptureSection: some View {
+        sectionContainer(
+            title: "TỰ ĐỘNG ĐƯA HÌNH CHỤP MÀN HÌNH VÀO KỆ (SCREENSHOT AUTO-CAPTURE)",
+            icon: "camera.viewfinder"
+        ) {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack {
+                    Toggle("Tự động nhận mọi hình chụp màn hình mới và bật Kệ ngay lập tức (⌘⇧3, ⌘⇧4, ⌘⇧5)", isOn: $settings.autoCaptureScreenshots)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 12.5, weight: .semibold))
+
+                    Spacer()
+
+                    if settings.autoCaptureScreenshots {
+                        Text("Đang theo dõi: \(screenshotService.primaryWatchedFolderDisplay)")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.teal.opacity(0.14))
+                            .foregroundStyle(Color.teal)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                if settings.autoCaptureScreenshots {
+                    Toggle("Tự động bắt cả ảnh chụp màn hình lưu vào Clipboard (⌘⌃⇧3 / ⌘⌃⇧4)", isOn: $settings.autoCaptureClipboardScreenshots)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 12))
+
+                    Divider()
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(
+                                screenshotService.isMacOSFloatingThumbnailEnabled
+                                    ? "Mẹo tăng tốc: macOS đang bật 'Xem trước ảnh thu nhỏ góc dưới' (~4s sau khi chụp mới lưu tệp)"
+                                    : "Chế độ Tức thì đang bật: Ảnh chụp màn hình nhảy thẳng vào DropShelf trong 0 giây!"
+                            )
+                            .font(.system(size: 11.5, weight: .medium))
+
+                            Text("Bạn có thể tắt/bật chờ ảnh thu nhỏ góc dưới của macOS để ảnh nhảy vào kệ ngay khoảnh khắc thả chuột.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            screenshotService.setMacOSFloatingThumbnailEnabled(!screenshotService.isMacOSFloatingThumbnailEnabled)
+                        } label: {
+                            Text(
+                                screenshotService.isMacOSFloatingThumbnailEnabled
+                                    ? "Bật nhảy tức thì (0 giây)"
+                                    : "Khôi phục ảnh góc macOS"
+                            )
+                            .font(.system(size: 11, weight: .semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 3. Dock Visibility & Startup Section
 
     private var dockAndStartupSection: some View {
         sectionContainer(
@@ -325,15 +395,14 @@ struct SettingsDashboardView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 3. Screen Position & Auto-Show Trigger
+    // MARK: - 4. Screen Position, Auto-Show & 3-Second Empty Auto-Hide
 
     private var positionAndAutoTriggerSection: some View {
         sectionContainer(
-            title: "VỊ TRÍ KỆ TRÊN MÀN HÌNH & TỰ ĐỘNG XUẤT HIỆN (YOINK STYLE)",
+            title: "VỊ TRÍ KỆ, TỰ ĐỘNG XUẤT HIỆN & TỰ ẨN SAU 3 GIÂY KHI TRỐNG",
             icon: "sparkles.rectangle.stack"
         ) {
             HStack(alignment: .top, spacing: 20) {
-                // Interactive Visual Screen Edge Picker
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Chọn nhanh vị trí neo Kệ")
                         .font(.system(size: 12, weight: .semibold))
@@ -393,8 +462,7 @@ struct SettingsDashboardView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // Trigger Mode & Shelf Size Options
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 11) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("Thời điểm tự động hiện Kệ khi kéo chuột")
                             .font(.system(size: 12, weight: .semibold))
@@ -413,6 +481,19 @@ struct SettingsDashboardView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
+                    HStack(spacing: 10) {
+                        Text("Tự ẩn khi Kệ trống (lướt nhầm chuột):")
+                            .font(.system(size: 12, weight: .semibold))
+                        Picker("", selection: $settings.emptyAutoHideOption) {
+                            ForEach(EmptyAutoHideOption.allCases) { opt in
+                                Text(opt.title).tag(opt)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 175)
+                    }
+
                     HStack(spacing: 16) {
                         Text("Kích thước Kệ:")
                             .font(.system(size: 12, weight: .semibold))
@@ -426,11 +507,11 @@ struct SettingsDashboardView: View {
                         .frame(width: 240)
                     }
 
-                    Toggle("Hiện thanh gờ mỏng sát mép màn hình khi kệ đang ẩn (chạm/kéo tệp vào mép để mở)", isOn: $settings.showEdgeHandle)
+                    Toggle("Hiện thanh gờ mỏng sát mép màn hình (rê hoặc kéo tệp chạm mép để mở kệ)", isOn: $settings.showEdgeHandle)
                         .toggleStyle(.switch)
                         .font(.system(size: 12))
 
-                    Toggle("Ghim giữ Kệ luôn hiển thị cố định trên màn hình", isOn: $settings.isShelfPinned)
+                    Toggle("Ghim giữ Kệ luôn hiển thị cố định trên màn hình (bỏ qua tự ẩn)", isOn: $settings.isShelfPinned)
                         .toggleStyle(.switch)
                         .font(.system(size: 12))
                 }
@@ -457,7 +538,7 @@ struct SettingsDashboardView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 4. Drag Behavior, Stacks & Global HotKey
+    // MARK: - 5. Drag Behavior, Stacks & Global HotKey
 
     private var dragBehaviorAndShortcutsSection: some View {
         sectionContainer(
@@ -537,7 +618,7 @@ struct SettingsDashboardView: View {
         }
     }
 
-    // MARK: - 5. GitHub Releases Auto-Update Section
+    // MARK: - 6. GitHub Releases Auto-Update Section
 
     private var githubUpdateFooterSection: some View {
         sectionContainer(
