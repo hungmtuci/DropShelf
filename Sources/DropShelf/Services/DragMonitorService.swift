@@ -8,6 +8,7 @@ final class DragMonitorService {
     private(set) var isSystemDragActive: Bool = false
 
     private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
     private var localKeyMonitor: Any?
 
     private var mouseDownPoint: NSPoint?
@@ -26,13 +27,27 @@ final class DragMonitorService {
         lastHandledDragChangeCount = NSPasteboard(name: .drag).changeCount
 
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseDragged, .leftMouseUp]
         ) { [weak self] event in
             let eventType = event.type
             let mouseLoc = NSEvent.mouseLocation
             Task { @MainActor in
                 self?.handleGlobalMouseEvent(type: eventType, mouseLocation: mouseLoc)
             }
+        }
+
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { event in
+            if let win = event.window,
+               win.styleMask.contains(.titled),
+               !ShelfPanelController.shared.isShelfOrHandleWindow(win) {
+                let mouseLoc = NSEvent.mouseLocation
+                Task { @MainActor in
+                    ShelfPanelController.shared.handleUserClickedScreen(at: mouseLoc)
+                }
+            }
+            return event
         }
 
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -72,6 +87,10 @@ final class DragMonitorService {
             NSEvent.removeMonitor(monitor)
             globalMouseMonitor = nil
         }
+        if let localMon = localMouseMonitor {
+            NSEvent.removeMonitor(localMon)
+            localMouseMonitor = nil
+        }
         if let keyMon = localKeyMonitor {
             NSEvent.removeMonitor(keyMon)
             localKeyMonitor = nil
@@ -91,6 +110,12 @@ final class DragMonitorService {
             resetShakeState()
             if !ShelfStore.shared.isDraggingOutFromShelf {
                 lastHandledDragChangeCount = NSPasteboard(name: .drag).changeCount
+                ShelfPanelController.shared.handleUserClickedScreen(at: mouseLocation)
+            }
+
+        case .rightMouseDown, .otherMouseDown:
+            if !ShelfStore.shared.isDraggingOutFromShelf {
+                ShelfPanelController.shared.handleUserClickedScreen(at: mouseLocation)
             }
 
         case .leftMouseDragged:

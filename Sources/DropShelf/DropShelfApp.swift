@@ -204,7 +204,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func showSettingsWindow() {
         AppSettings.shared.refreshLaunchAtLoginStatus()
+        ShelfPanelController.shared.refreshAvailableDisplays()
 
+        let wasVisible = settingsWindow?.isVisible ?? false
         if settingsWindow == nil {
             let rootView = SettingsDashboardView(
                 settings: AppSettings.shared,
@@ -220,9 +222,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             win.isReleasedWhenClosed = false
             win.delegate = self
-            win.setContentSize(NSSize(width: 820, height: 730))
+            win.setContentSize(NSSize(width: 820, height: 750))
             win.center()
             self.settingsWindow = win
+        }
+
+        if let win = settingsWindow,
+           let targetScreen = ShelfPanelController.screenContaining(NSEvent.mouseLocation) ?? NSScreen.main {
+            if !wasVisible || win.screen?.dsDisplayID != targetScreen.dsDisplayID {
+                let vf = targetScreen.visibleFrame
+                let size = win.frame.size
+                let origin = NSPoint(
+                    x: round(vf.midX - size.width / 2),
+                    y: round(vf.midY - size.height / 2)
+                )
+                win.setFrameOrigin(origin)
+            }
         }
 
         bringSettingsWindowToFront()

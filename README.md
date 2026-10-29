@@ -6,7 +6,11 @@
 
 ## ✨ Tính năng nổi bật
 
-- **Tự động đưa Hình chụp màn hình mới vào Kệ (`v1.1.0` — `0%` CPU với `FSEventStream`)**:
+- **Hỗ trợ Đa Màn Hình & Đa Không Gian Làm Việc (`v1.2.0` — Multi-Monitor & Mission Control Spaces)**:
+  - **Tự động đi theo màn hình đang chọn**: Khi bấm chuột sang màn hình khác, kéo tệp ở màn hình phụ hoặc bấm icon Menu Bar trên màn hình phụ, cửa sổ Kệ tự động nhảy sang đúng màn hình bạn đang thao tác.
+  - **Chọn cố định màn hình hiển thị**: Hỗ trợ ghim Kệ cố định trên từng màn hình cụ thể ngay trong **Cài đặt**, **Menu Bar** hoặc nút chuyển nhanh trên Kệ.
+  - **Thanh gờ mép trên tất cả màn hình** & giữ hiển thị mượt qua mọi Desktop Space / Full-Screen.
+- **Tự động đưa Hình chụp màn hình mới vào Kệ (`v1.1.1` — `0%` CPU với `FSEventStream`)**:
   - Tự động phát hiện thư mục lưu ảnh chụp màn hình của macOS (hỗ trợ cả thư mục tuỳ chỉnh trong `com.apple.screencapture` lẫn `~/Desktop`) qua nhân `FSEventStream` và kiểm tra siêu dữ liệu `kMDItemIsScreenCapture` — **không quét thư mục cũ**, tốc độ tức thì kể cả thư mục có hàng chục nghìn tệp.
   - Bắt cả **ảnh chụp màn hình lưu vào Clipboard (`⌘ + ⌃ + ⇧ + 3` / `⌘ + ⌃ + ⇧ + 4`)**, tự động đóng gói thành tệp `.png` sắc nét và bật kệ ra ngay để kéo thả vào Zalo, Messenger, Slack, Mail, Docs hoặc Finder.
   - Tích hợp nút 1 chạm bật **Chế độ nhảy tức thì `0 giây`** (tắt độ trễ xem trước 4–5 giây ở góc dưới màn hình của macOS nếu muốn).
@@ -47,8 +51,8 @@
 ## 📥 Tải về & Cài đặt nhanh (macOS 14.0+ Universal: Apple Silicon & Intel)
 
 1. Tải bộ cài mới nhất tại trang **[Releases](https://github.com/hungmtuci/DropShelf/releases/latest)**:
-   - **`DropShelf-Installer-v1.1.1.dmg`** *(Khuyên dùng)*
-   - Hoặc **`DropShelf-v1.1.1-macOS.zip`** *(Hoặc bấm nút **Kiểm tra cập nhật** ngay trong DropShelf để tự nâng cấp 1 chạm!)*
+   - **`DropShelf-Installer-v1.2.0.dmg`** *(Khuyên dùng)*
+   - Hoặc **`DropShelf-v1.2.0-macOS.zip`** *(Hoặc bấm nút **Kiểm tra cập nhật** ngay trong DropShelf để tự nâng cấp 1 chạm!)*
 2. Mở file `.dmg`:
    - Kéo `DropShelf.app` thả vào thư mục **`Applications`**, **HOẶC** nhấp chuột phải vào `Cai_Dat_DropShelf.command` → chọn **Open** để tự động cài đặt vào `/Applications` và gỡ cờ cách ly Gatekeeper.
 3. Nếu macOS cảnh báo ứng dụng chưa công chứng Apple Developer ID khi mở lần đầu trên máy mới, chạy lệnh sau trong Terminal:

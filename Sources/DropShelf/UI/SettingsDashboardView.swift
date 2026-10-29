@@ -367,127 +367,237 @@ struct SettingsDashboardView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 4. Screen Position, Auto-Show & 3-Second Empty Auto-Hide
+    // MARK: - 4. Screen Position, Multi-Monitor, Auto-Show & 3-Second Empty Auto-Hide
 
     private var positionAndAutoTriggerSection: some View {
         sectionContainer(
-            title: "VỊ TRÍ KỆ, TỰ ĐỘNG XUẤT HIỆN & TỰ ẨN SAU 3 GIÂY KHI TRỐNG",
-            icon: "sparkles.rectangle.stack"
+            title: "MÀN HÌNH HIỂN THỊ, VỊ TRÍ KỆ & TỰ ẨN SAU 3 GIÂY KHI TRỐNG",
+            icon: "display.2"
         ) {
-            HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Chọn nhanh vị trí neo Kệ")
-                        .font(.system(size: 12, weight: .semibold))
+            VStack(alignment: .leading, spacing: 14) {
+                multiMonitorPickerBar
 
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.indigo.opacity(0.16), Color.cyan.opacity(0.10)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 236, height: 146)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.2)
-                            )
+                Divider()
 
-                        HStack {
-                            VStack(spacing: 10) {
-                                screenEdgeSlot(.leftTop, label: "Trái Trên")
-                                screenEdgeSlot(.leftCenter, label: "Trái Giữa")
-                                screenEdgeSlot(.leftBottom, label: "Trái Dưới")
-                            }
-                            Spacer()
-                            Button {
-                                settings.edgePosition = .freeFloating
-                                panelController.showShelfManually()
-                            } label: {
-                                Text("Tự do")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(
-                                        settings.edgePosition == .freeFloating
-                                            ? Color.accentColor
-                                            : Color.primary.opacity(0.08)
-                                    )
-                                    .foregroundStyle(settings.edgePosition == .freeFloating ? .white : .secondary)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            Spacer()
-                            VStack(spacing: 10) {
-                                screenEdgeSlot(.rightTop, label: "Phải Trên")
-                                screenEdgeSlot(.rightCenter, label: "Phải Giữa")
-                                screenEdgeSlot(.rightBottom, label: "Phải Dưới")
-                            }
-                        }
-                        .padding(10)
-                        .frame(width: 236, height: 146)
-                    }
-
-                    Text("Đang chọn: \(settings.edgePosition.title)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 11) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Thời điểm tự động hiện Kệ khi kéo chuột")
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Chọn nhanh vị trí neo Kệ")
                             .font(.system(size: 12, weight: .semibold))
 
-                        Picker("", selection: $settings.autoShowTrigger) {
-                            ForEach(AutoShowTrigger.allCases) { mode in
-                                Text(mode.title).tag(mode)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.indigo.opacity(0.16), Color.cyan.opacity(0.10)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 236, height: 146)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.2)
+                                )
 
-                        Text(settings.autoShowTrigger.shortNote)
+                            HStack {
+                                VStack(spacing: 10) {
+                                    screenEdgeSlot(.leftTop, label: "Trái Trên")
+                                    screenEdgeSlot(.leftCenter, label: "Trái Giữa")
+                                    screenEdgeSlot(.leftBottom, label: "Trái Dưới")
+                                }
+                                Spacer()
+                                Button {
+                                    settings.edgePosition = .freeFloating
+                                    panelController.showShelfManually()
+                                } label: {
+                                    Text("Tự do")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 5)
+                                        .background(
+                                            settings.edgePosition == .freeFloating
+                                                ? Color.accentColor
+                                                : Color.primary.opacity(0.08)
+                                        )
+                                        .foregroundStyle(settings.edgePosition == .freeFloating ? .white : .secondary)
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                Spacer()
+                                VStack(spacing: 10) {
+                                    screenEdgeSlot(.rightTop, label: "Phải Trên")
+                                    screenEdgeSlot(.rightCenter, label: "Phải Giữa")
+                                    screenEdgeSlot(.rightBottom, label: "Phải Dưới")
+                                }
+                            }
+                            .padding(10)
+                            .frame(width: 236, height: 146)
+                        }
+
+                        Text("Đang chọn: \(settings.edgePosition.title)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    HStack(spacing: 10) {
-                        Text("Tự ẩn khi Kệ trống (lướt nhầm chuột):")
-                            .font(.system(size: 12, weight: .semibold))
-                        Picker("", selection: $settings.emptyAutoHideOption) {
-                            ForEach(EmptyAutoHideOption.allCases) { opt in
-                                Text(opt.title).tag(opt)
+                    VStack(alignment: .leading, spacing: 11) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Thời điểm tự động hiện Kệ khi kéo chuột")
+                                .font(.system(size: 12, weight: .semibold))
+
+                            Picker("", selection: $settings.autoShowTrigger) {
+                                ForEach(AutoShowTrigger.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
                             }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 175)
-                    }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
 
-                    HStack(spacing: 16) {
-                        Text("Kích thước Kệ:")
-                            .font(.system(size: 12, weight: .semibold))
-                        Picker("", selection: $settings.shelfSize) {
-                            ForEach(ShelfSizePreset.allCases) { preset in
-                                Text(preset.title).tag(preset)
+                            Text(settings.autoShowTrigger.shortNote)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        HStack(spacing: 10) {
+                            Text("Tự ẩn khi Kệ trống (lướt nhầm chuột):")
+                                .font(.system(size: 12, weight: .semibold))
+                            Picker("", selection: $settings.emptyAutoHideOption) {
+                                ForEach(EmptyAutoHideOption.allCases) { opt in
+                                    Text(opt.title).tag(opt)
+                                }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 175)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 240)
+
+                        HStack(spacing: 16) {
+                            Text("Kích thước Kệ:")
+                                .font(.system(size: 12, weight: .semibold))
+                            Picker("", selection: $settings.shelfSize) {
+                                ForEach(ShelfSizePreset.allCases) { preset in
+                                    Text(preset.title).tag(preset)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                            .frame(width: 240)
+                        }
+
+                        Toggle("Hiện thanh gờ mỏng sát mép tất cả màn hình (rê hoặc kéo tệp chạm mép để mở kệ)", isOn: $settings.showEdgeHandle)
+                            .toggleStyle(.switch)
+                            .font(.system(size: 12))
+
+                        Toggle("Ghim giữ Kệ luôn hiển thị cố định trên màn hình (bỏ qua tự ẩn)", isOn: $settings.isShelfPinned)
+                            .toggleStyle(.switch)
+                            .font(.system(size: 12))
                     }
-
-                    Toggle("Hiện thanh gờ mỏng sát mép màn hình (rê hoặc kéo tệp chạm mép để mở kệ)", isOn: $settings.showEdgeHandle)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12))
-
-                    Toggle("Ghim giữ Kệ luôn hiển thị cố định trên màn hình (bỏ qua tự ẩn)", isOn: $settings.isShelfPinned)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var multiMonitorPickerBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Chọn màn hình hiển thị cửa sổ Kệ (\(max(1, panelController.availableDisplays.count)) màn hình đang kết nối)")
+                    .font(.system(size: 12.5, weight: .semibold))
+
+                Spacer()
+
+                if panelController.availableDisplays.count > 1 {
+                    Button {
+                        panelController.cycleToNextScreen()
+                    } label: {
+                        Label("Chuyển Kệ sang màn hình kia ngay", systemImage: "arrow.left.arrow.right.square")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .controlSize(.small)
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    let isAuto = settings.displayMode == .followActiveScreen
+                    Button {
+                        panelController.selectFollowActiveScreen()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "cursorarrow.motionlines")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(isAuto ? Color.accentColor : Color.secondary)
+
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Tự động theo màn hình đang chọn")
+                                    .font(.system(size: 11.5, weight: .bold))
+                                    .foregroundStyle(.primary)
+                                Text("Tự nhảy sang màn hình bạn bấm chuột / kéo thả")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Image(systemName: isAuto ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(isAuto ? Color.accentColor : Color.secondary.opacity(0.45))
+                        }
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(isAuto ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.035))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(isAuto ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isAuto ? 1.5 : 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    ForEach(panelController.availableDisplays) { disp in
+                        let isPinnedHere = (settings.displayMode == .specificDisplay && settings.preferredDisplayID == disp.displayID)
+                        let isShelfCurrentlyHere = (panelController.currentDisplayID == disp.displayID)
+
+                        Button {
+                            panelController.selectSpecificDisplay(disp.displayID)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "display")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(isPinnedHere ? Color.accentColor : (isShelfCurrentlyHere ? Color.green : Color.secondary))
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    HStack(spacing: 5) {
+                                        Text(disp.shortTitle)
+                                            .font(.system(size: 11.5, weight: .bold))
+                                            .foregroundStyle(.primary)
+                                        if isShelfCurrentlyHere {
+                                            Circle()
+                                                .fill(Color.green)
+                                                .frame(width: 6, height: 6)
+                                        }
+                                    }
+                                    Text("\(disp.resolutionText)\(isShelfCurrentlyHere ? " • Đang hiện Kệ" : "")")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Image(systemName: isPinnedHere ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(isPinnedHere ? Color.accentColor : Color.secondary.opacity(0.45))
+                            }
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(isPinnedHere ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.035))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(isPinnedHere ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isPinnedHere ? 1.5 : 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
     }

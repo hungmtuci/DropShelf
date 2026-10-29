@@ -301,7 +301,7 @@ struct ShelfPanelView: View {
     // MARK: - Footer
 
     private var footerBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             if store.entries.count > 1 {
                 ZStack {
                     HStack(spacing: 5) {
@@ -309,6 +309,8 @@ struct ShelfPanelView: View {
                             .font(.system(size: 10.5, weight: .semibold))
                         Text("Kéo tất cả (\(store.totalFileCount))")
                             .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
@@ -325,7 +327,11 @@ struct ShelfPanelView: View {
                 }
                 .help("Nhấn giữ và kéo nút này để kéo toàn bộ các tệp trên kệ ra cùng lúc")
 
-                Spacer()
+                Spacer(minLength: 2)
+
+                if panelController.availableDisplays.count > 1 {
+                    quickSwitchDisplayButton
+                }
 
                 Button {
                     store.combineAllIntoStack()
@@ -335,6 +341,8 @@ struct ShelfPanelView: View {
                             .font(.system(size: 10))
                         Text("Gộp Stack")
                             .font(.system(size: 10.5, weight: .medium))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -344,14 +352,34 @@ struct ShelfPanelView: View {
                 .buttonStyle(.plain)
                 .help("Gộp tất cả các mục hiện có trên kệ thành 1 nhóm Stack")
             } else {
-                Text("Giữ ⌥ khi kéo: Sao chép • Space: Xem nhanh")
+                Text("Giữ ⌥ kéo: Sao chép • Space: Xem nhanh")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
+
+                if panelController.availableDisplays.count > 1 {
+                    quickSwitchDisplayButton
+                }
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    private var quickSwitchDisplayButton: some View {
+        Button {
+            panelController.cycleToNextScreen()
+        } label: {
+            Image(systemName: "display.2")
+                .font(.system(size: 10.5, weight: .semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(Color.primary.opacity(0.08))
+                .foregroundStyle(.secondary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Chuyển nhanh cửa sổ Kệ sang màn hình kia")
     }
 }
 

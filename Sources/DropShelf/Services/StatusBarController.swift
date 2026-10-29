@@ -69,13 +69,67 @@ final class StatusBarController: NSObject {
         header.isEnabled = false
         menu.addItem(header)
 
-        let toggleTitle = ShelfPanelController.shared.isVisible
-            ? "Ẩn Kệ nổi (\(settings.hotKeyBinding.readableDisplay))"
-            : "Hiện Kệ nổi (\(settings.hotKeyBinding.readableDisplay))"
+        let panelCtrl = ShelfPanelController.shared
+        panelCtrl.refreshAvailableDisplays()
+
+        let mouseScreenID = ShelfPanelController.screenContaining(NSEvent.mouseLocation)?.dsDisplayID ?? 0
+        let isShelfOnOtherScreen = panelCtrl.isVisible
+            && settings.displayMode == .followActiveScreen
+            && mouseScreenID != 0
+            && mouseScreenID != panelCtrl.currentDisplayID
+
+        let toggleTitle: String = {
+            if isShelfOnOtherScreen {
+                return "Đưa Kệ sang màn hình này (\(settings.hotKeyBinding.readableDisplay))"
+            }
+            return panelCtrl.isVisible
+                ? "Ẩn Kệ nổi (\(settings.hotKeyBinding.readableDisplay))"
+                : "Hiện Kệ nổi (\(settings.hotKeyBinding.readableDisplay))"
+        }()
         let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleShelfAction), keyEquivalent: "")
         toggleItem.image = NSImage(systemSymbolName: "sidebar.right", accessibilityDescription: nil)
         toggleItem.target = self
         menu.addItem(toggleItem)
+
+        if panelCtrl.availableDisplays.count > 1 {
+            let hopItem = NSMenuItem(
+                title: "Chuyển Kệ sang màn hình kia",
+                action: #selector(cycleShelfScreenAction),
+                keyEquivalent: ""
+            )
+            hopItem.image = NSImage(systemSymbolName: "display.2", accessibilityDescription: nil)
+            hopItem.target = self
+            menu.addItem(hopItem)
+
+            let displayMenuParent = NSMenuItem(title: "Chọn màn hình hiển thị Kệ", action: nil, keyEquivalent: "")
+            displayMenuParent.image = NSImage(systemSymbolName: "display", accessibilityDescription: nil)
+            let displaySubmenu = NSMenu(title: "Chọn màn hình hiển thị Kệ")
+
+            let autoItem = NSMenuItem(
+                title: "Tự động theo màn hình đang chọn",
+                action: #selector(selectAutoFollowScreenAction),
+                keyEquivalent: ""
+            )
+            autoItem.state = (settings.displayMode == .followActiveScreen) ? .on : .off
+            autoItem.target = self
+            displaySubmenu.addItem(autoItem)
+            displaySubmenu.addItem(.separator())
+
+            for disp in panelCtrl.availableDisplays {
+                let item = NSMenuItem(
+                    title: disp.detailedTitle,
+                    action: #selector(selectSpecificDisplayMenuAction(_:)),
+                    keyEquivalent: ""
+                )
+                item.tag = Int(disp.displayID)
+                item.state = (settings.displayMode == .specificDisplay && settings.preferredDisplayID == disp.displayID) ? .on : .off
+                item.target = self
+                displaySubmenu.addItem(item)
+            }
+
+            displayMenuParent.submenu = displaySubmenu
+            menu.addItem(displayMenuParent)
+        }
 
         let pasteItem = NSMenuItem(title: "Dán từ Clipboard vào Kệ", action: #selector(pasteClipboardAction), keyEquivalent: "")
         pasteItem.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
@@ -186,6 +240,19 @@ final class StatusBarController: NSObject {
 
     @objc private func toggleShelfAction() {
         ShelfPanelController.shared.toggleShelf()
+    }
+
+    @objc private func cycleShelfScreenAction() {
+        ShelfPanelController.shared.cycleToNextScreen()
+    }
+
+    @objc private func selectAutoFollowScreenAction() {
+        ShelfPanelController.shared.selectFollowActiveScreen()
+    }
+
+    @objc private func selectSpecificDisplayMenuAction(_ sender: NSMenuItem) {
+        let id = UInt32(bitPattern: Int32(truncatingIfNeeded: sender.tag))
+        ShelfPanelController.shared.selectSpecificDisplay(id)
     }
 
     @objc private func pasteClipboardAction() {

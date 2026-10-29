@@ -45,6 +45,50 @@ enum ShelfEdgePosition: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ShelfDisplayMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case followActiveScreen = "follow_active"
+    case specificDisplay = "specific_display"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .followActiveScreen:
+            return "Tự động theo màn hình đang chọn"
+        case .specificDisplay:
+            return "Cố định trên màn hình chỉ định"
+        }
+    }
+}
+
+struct ConnectedDisplayInfo: Identifiable, Equatable {
+    let displayID: UInt32
+    let index: Int
+    let name: String
+    let resolutionText: String
+    let isMain: Bool
+
+    var id: UInt32 { displayID }
+
+    var shortTitle: String {
+        "Màn hình \(index): \(name)"
+    }
+
+    var detailedTitle: String {
+        "Màn hình \(index): \(name) (\(resolutionText))"
+    }
+}
+
+extension NSScreen {
+    var dsDisplayID: UInt32 {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+    }
+
+    var dsResolutionText: String {
+        "\(Int(frame.width))×\(Int(frame.height))"
+    }
+}
+
 enum AutoShowTrigger: String, Codable, CaseIterable, Identifiable, Sendable {
     case immediateOnDrag = "immediate"
     case edgeOrShake = "edge_or_shake"
@@ -234,6 +278,8 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     var showInDock: Bool = true
     var openSettingsOnLaunch: Bool = true
     var edgePosition: ShelfEdgePosition = .rightCenter
+    var displayMode: ShelfDisplayMode = .followActiveScreen
+    var preferredDisplayID: UInt32? = nil
     var autoShowTrigger: AutoShowTrigger = .immediateOnDrag
     var emptyAutoHideOption: EmptyAutoHideOption = .threeSeconds
     var dragOutBehavior: DragOutBehavior = .moveLikeFinder
@@ -249,12 +295,16 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     var hotKeyBinding: HotKeyBinding = .defaultToggle
     var customFloatingX: Double? = nil
     var customFloatingY: Double? = nil
+    var customFloatingRelX: Double? = nil
+    var customFloatingRelY: Double? = nil
 
     init(
         initialized: Bool = true,
         showInDock: Bool = true,
         openSettingsOnLaunch: Bool = true,
         edgePosition: ShelfEdgePosition = .rightCenter,
+        displayMode: ShelfDisplayMode = .followActiveScreen,
+        preferredDisplayID: UInt32? = nil,
         autoShowTrigger: AutoShowTrigger = .immediateOnDrag,
         emptyAutoHideOption: EmptyAutoHideOption = .threeSeconds,
         dragOutBehavior: DragOutBehavior = .moveLikeFinder,
@@ -269,12 +319,16 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         instantScreenshotCapture: Bool = true,
         hotKeyBinding: HotKeyBinding = .defaultToggle,
         customFloatingX: Double? = nil,
-        customFloatingY: Double? = nil
+        customFloatingY: Double? = nil,
+        customFloatingRelX: Double? = nil,
+        customFloatingRelY: Double? = nil
     ) {
         self.initialized = initialized
         self.showInDock = showInDock
         self.openSettingsOnLaunch = openSettingsOnLaunch
         self.edgePosition = edgePosition
+        self.displayMode = displayMode
+        self.preferredDisplayID = preferredDisplayID
         self.autoShowTrigger = autoShowTrigger
         self.emptyAutoHideOption = emptyAutoHideOption
         self.dragOutBehavior = dragOutBehavior
@@ -290,6 +344,8 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         self.hotKeyBinding = hotKeyBinding
         self.customFloatingX = customFloatingX
         self.customFloatingY = customFloatingY
+        self.customFloatingRelX = customFloatingRelX
+        self.customFloatingRelY = customFloatingRelY
     }
 
     init(from decoder: Decoder) throws {
@@ -298,6 +354,8 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         showInDock = try c.decodeIfPresent(Bool.self, forKey: .showInDock) ?? true
         openSettingsOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .openSettingsOnLaunch) ?? true
         edgePosition = try c.decodeIfPresent(ShelfEdgePosition.self, forKey: .edgePosition) ?? .rightCenter
+        displayMode = try c.decodeIfPresent(ShelfDisplayMode.self, forKey: .displayMode) ?? .followActiveScreen
+        preferredDisplayID = try c.decodeIfPresent(UInt32.self, forKey: .preferredDisplayID)
         autoShowTrigger = try c.decodeIfPresent(AutoShowTrigger.self, forKey: .autoShowTrigger) ?? .immediateOnDrag
         emptyAutoHideOption = try c.decodeIfPresent(EmptyAutoHideOption.self, forKey: .emptyAutoHideOption) ?? .threeSeconds
         dragOutBehavior = try c.decodeIfPresent(DragOutBehavior.self, forKey: .dragOutBehavior) ?? .moveLikeFinder
@@ -313,6 +371,8 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         hotKeyBinding = try c.decodeIfPresent(HotKeyBinding.self, forKey: .hotKeyBinding) ?? .defaultToggle
         customFloatingX = try c.decodeIfPresent(Double.self, forKey: .customFloatingX)
         customFloatingY = try c.decodeIfPresent(Double.self, forKey: .customFloatingY)
+        customFloatingRelX = try c.decodeIfPresent(Double.self, forKey: .customFloatingRelX)
+        customFloatingRelY = try c.decodeIfPresent(Double.self, forKey: .customFloatingRelY)
     }
 }
 
@@ -347,6 +407,22 @@ final class AppSettings: ObservableObject {
             guard edgePosition != oldValue else { return }
             saveSettingsAsync()
             onLayoutPreferenceChanged?()
+        }
+    }
+
+    @Published var displayMode: ShelfDisplayMode {
+        didSet {
+            guard displayMode != oldValue else { return }
+            saveSettingsAsync()
+            onDisplayPreferenceChanged?()
+        }
+    }
+
+    @Published var preferredDisplayID: UInt32? {
+        didSet {
+            guard preferredDisplayID != oldValue else { return }
+            saveSettingsAsync()
+            onDisplayPreferenceChanged?()
         }
     }
 
@@ -454,8 +530,11 @@ final class AppSettings: ObservableObject {
 
     var customFloatingX: Double?
     var customFloatingY: Double?
+    var customFloatingRelX: Double?
+    var customFloatingRelY: Double?
 
     var onLayoutPreferenceChanged: (() -> Void)?
+    var onDisplayPreferenceChanged: (() -> Void)?
     var onEdgeHandlePreferenceChanged: (() -> Void)?
     var onPinStateChanged: (() -> Void)?
     var onEmptyAutoHideChanged: (() -> Void)?
@@ -490,6 +569,8 @@ final class AppSettings: ObservableObject {
         self.showInDock = loaded.showInDock
         self.openSettingsOnLaunch = loaded.openSettingsOnLaunch
         self.edgePosition = loaded.edgePosition
+        self.displayMode = loaded.displayMode
+        self.preferredDisplayID = loaded.preferredDisplayID
         self.autoShowTrigger = loaded.autoShowTrigger
         self.emptyAutoHideOption = loaded.emptyAutoHideOption
         self.dragOutBehavior = loaded.dragOutBehavior
@@ -505,6 +586,8 @@ final class AppSettings: ObservableObject {
         self.hotKeyBinding = loaded.hotKeyBinding
         self.customFloatingX = loaded.customFloatingX
         self.customFloatingY = loaded.customFloatingY
+        self.customFloatingRelX = loaded.customFloatingRelX
+        self.customFloatingRelY = loaded.customFloatingRelY
         self.launchAtLogin = (SMAppService.mainApp.status == .enabled)
     }
 
@@ -515,6 +598,7 @@ final class AppSettings: ObservableObject {
         NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
 
         DispatchQueue.main.async {
+            ShelfPanelController.shared.reapplySpaceCollectionBehavior()
             if wasShelfVisible {
                 ShelfPanelController.shared.ensureFront()
             }
@@ -547,9 +631,11 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    func saveCustomFloatingOrigin(_ origin: NSPoint) {
+    func saveCustomFloatingPosition(origin: NSPoint, relX: Double?, relY: Double?) {
         customFloatingX = Double(origin.x)
         customFloatingY = Double(origin.y)
+        if let relX { customFloatingRelX = min(max(relX, 0.0), 1.0) }
+        if let relY { customFloatingRelY = min(max(relY, 0.0), 1.0) }
         saveSettingsAsync()
     }
 
@@ -559,6 +645,8 @@ final class AppSettings: ObservableObject {
             showInDock: showInDock,
             openSettingsOnLaunch: openSettingsOnLaunch,
             edgePosition: edgePosition,
+            displayMode: displayMode,
+            preferredDisplayID: preferredDisplayID,
             autoShowTrigger: autoShowTrigger,
             emptyAutoHideOption: emptyAutoHideOption,
             dragOutBehavior: dragOutBehavior,
@@ -573,7 +661,9 @@ final class AppSettings: ObservableObject {
             instantScreenshotCapture: instantScreenshotCapture,
             hotKeyBinding: hotKeyBinding,
             customFloatingX: customFloatingX,
-            customFloatingY: customFloatingY
+            customFloatingY: customFloatingY,
+            customFloatingRelX: customFloatingRelX,
+            customFloatingRelY: customFloatingRelY
         )
         let targetURL = settingsFileURL
         DispatchQueue.global(qos: .utility).async {
