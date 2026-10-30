@@ -177,13 +177,31 @@ final class StatusBarController: NSObject {
         menu.addItem(pinShelfItem)
 
         let launchItem = NSMenuItem(
-            title: "Tự khởi động cùng macOS",
+            title: "Khởi động cùng macOS",
             action: #selector(toggleLaunchAtLoginAction),
             keyEquivalent: ""
         )
         launchItem.state = settings.launchAtLogin ? .on : .off
         launchItem.target = self
         menu.addItem(launchItem)
+
+        let openShelfOnLaunchItem = NSMenuItem(
+            title: "Bật bảng Kệ nổi khi khởi động",
+            action: #selector(toggleOpenShelfOnLaunchAction),
+            keyEquivalent: ""
+        )
+        openShelfOnLaunchItem.state = settings.openShelfOnLaunch ? .on : .off
+        openShelfOnLaunchItem.target = self
+        menu.addItem(openShelfOnLaunchItem)
+
+        let openSettingsOnLaunchItem = NSMenuItem(
+            title: "Bật bảng Cài đặt khi khởi động",
+            action: #selector(toggleOpenSettingsOnLaunchAction),
+            keyEquivalent: ""
+        )
+        openSettingsOnLaunchItem.state = settings.openSettingsOnLaunch ? .on : .off
+        openSettingsOnLaunchItem.target = self
+        menu.addItem(openSettingsOnLaunchItem)
 
         menu.addItem(.separator())
 
@@ -269,6 +287,14 @@ final class StatusBarController: NSObject {
 
     @objc private func toggleLaunchAtLoginAction() {
         AppSettings.shared.launchAtLogin.toggle()
+    }
+
+    @objc private func toggleOpenShelfOnLaunchAction() {
+        AppSettings.shared.openShelfOnLaunch.toggle()
+    }
+
+    @objc private func toggleOpenSettingsOnLaunchAction() {
+        AppSettings.shared.openSettingsOnLaunch.toggle()
     }
 
     @objc private func checkUpdatesAction() {

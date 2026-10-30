@@ -6,6 +6,9 @@
 
 ## ✨ Tính năng nổi bật
 
+- **Tuỳ chọn Khởi động nhanh & Ẩn hoàn toàn khỏi thanh Dock (`v1.5.0`)**:
+  - Tích hợp nút chọn nhanh **`Khởi động cùng macOS`** và **`Bật bảng này khi khởi động`** ngay trên cả **Kệ nổi** lẫn thanh bên **Cài đặt** (kèm Menu Bar).
+  - Sửa triệt để chế độ **Ẩn trên thanh Dock** (`LSUIElement` + `ActivationPolicy`): khi đã chọn ẩn khỏi Dock, đóng và mở lại ứng dụng sẽ **không bao giờ hiện lại icon trên thanh Dock**.
 - **Hỗ trợ Đa Màn Hình & Đa Không Gian Làm Việc (`v1.2.0` — Multi-Monitor & Mission Control Spaces)**:
   - **Tự động đi theo màn hình đang chọn**: Khi bấm chuột sang màn hình khác, kéo tệp ở màn hình phụ hoặc bấm icon Menu Bar trên màn hình phụ, cửa sổ Kệ tự động nhảy sang đúng màn hình bạn đang thao tác.
   - **Chọn cố định màn hình hiển thị**: Hỗ trợ ghim Kệ cố định trên từng màn hình cụ thể ngay trong **Cài đặt**, **Menu Bar** hoặc nút chuyển nhanh trên Kệ.
@@ -51,8 +54,8 @@
 ## 📥 Tải về & Cài đặt nhanh (macOS 14.0+ Universal: Apple Silicon & Intel)
 
 1. Tải bộ cài mới nhất tại trang **[Releases](https://github.com/hungmtuci/DropShelf/releases/latest)**:
-   - **`DropShelf-Installer-v1.4.0.dmg`** *(Khuyên dùng)*
-   - Hoặc **`DropShelf-v1.4.0-macOS.zip`** *(Hoặc bấm nút **Update qua GitHub** ngay trên Kệ / Cài đặt để tự nâng cấp 1 chạm!)*
+   - **`DropShelf-Installer-v1.5.0.dmg`** *(Khuyên dùng)*
+   - Hoặc **`DropShelf-v1.5.0-macOS.zip`** *(Hoặc bấm nút **Update qua GitHub** ngay trên Kệ / Cài đặt để tự nâng cấp 1 chạm!)*
 2. Mở file `.dmg`:
    - Kéo `DropShelf.app` thả vào thư mục **`Applications`**, **HOẶC** nhấp chuột phải vào `Cai_Dat_DropShelf.command` → chọn **Open** để tự động cài đặt vào `/Applications` và gỡ cờ cách ly Gatekeeper.
 3. Nếu macOS cảnh báo ứng dụng chưa công chứng Apple Developer ID khi mở lần đầu trên máy mới, chạy lệnh sau trong Terminal:

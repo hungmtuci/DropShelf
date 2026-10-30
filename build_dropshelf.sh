@@ -7,8 +7,8 @@ cd "$PROJECT_DIR"
 
 APP_NAME="DropShelf"
 BUNDLE_ID="com.hunglx.DropShelf"
-VERSION="1.4.0"
-BUILD_NUMBER="6"
+VERSION="1.5.0"
+BUILD_NUMBER="7"
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
 ROOT_APP_BUNDLE="$ROOT_WORKSPACE_DIR/$APP_NAME.app"
 DIST_DIR="$PROJECT_DIR/dist"
@@ -142,6 +142,8 @@ cat > "$STAGE_CONTENTS/Info.plist" <<EOF
     <string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>CFBundleDocumentTypes</key>
@@ -198,6 +200,7 @@ pkill -f DropShelf 2>/dev/null || true
 rm -rf "$APP_DST"
 ditto --noextattr "$APP_SRC" "$APP_DST"
 xattr -cr "$APP_DST" 2>/dev/null || true
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DST" 2>/dev/null || true
 
 echo "✓ Đã cài đặt thành công tại: $APP_DST"
 echo "✓ Đang khởi chạy DropShelf..."

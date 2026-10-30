@@ -49,6 +49,7 @@ final class ShelfPanelController: ObservableObject {
             defer: false
         )
         panel.isFloatingPanel = true
+        panel.isRestorable = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         panel.collectionBehavior = Self.shelfCollectionBehavior
@@ -132,8 +133,8 @@ final class ShelfPanelController: ObservableObject {
             self?.scheduleEmptyAutoHideIfNeeded()
         }
 
-        if AppSettings.shared.isShelfPinned || !ShelfStore.shared.entries.isEmpty {
-            showShelfManually()
+        if AppSettings.shared.openShelfOnLaunch || AppSettings.shared.isShelfPinned {
+            showShelfOnLaunch()
         } else {
             activeScreen = resolveTargetScreen(preferredPoint: NSEvent.mouseLocation)
             currentDisplayID = activeScreen?.dsDisplayID ?? 0
@@ -402,6 +403,14 @@ final class ShelfPanelController: ObservableObject {
         }
     }
 
+    func showShelfOnLaunch() {
+        wasSummonedByDrag = false
+        didReceiveDropDuringCurrentSummon = false
+        cancelEmptyAutoHideTimer()
+        let target = resolveTargetScreen(preferredPoint: NSEvent.mouseLocation)
+        presentShelf(on: target)
+    }
+
     func showShelfManually() {
         wasSummonedByDrag = false
         didReceiveDropDuringCurrentSummon = false
@@ -665,6 +674,7 @@ final class ShelfPanelController: ObservableObject {
         let headerHeight: CGFloat = 46
         let updateBannerHeight: CGFloat = UpdateCheckerService.shared.availableVersion != nil ? 36 : 0
         let dropBannerHeight: CGFloat = count == 0 ? 156 : 58
+        let startupOptionsHeight: CGFloat = 52
         let footerHeight: CGFloat = count > 1 ? 64 : 32
 
         var cardsHeight: CGFloat = 0
@@ -678,8 +688,8 @@ final class ShelfPanelController: ObservableObject {
             }
         }
 
-        let desiredHeight = headerHeight + updateBannerHeight + dropBannerHeight + cardsHeight + footerHeight + 16
-        let height = min(max(desiredHeight, 236), min(580, vf.height - 32))
+        let desiredHeight = headerHeight + updateBannerHeight + dropBannerHeight + cardsHeight + startupOptionsHeight + footerHeight + 16
+        let height = min(max(desiredHeight, 288), min(620, vf.height - 32))
         let edgeMargin: CGFloat = 8
 
         let pos = AppSettings.shared.edgePosition
@@ -737,6 +747,7 @@ final class ShelfPanelController: ObservableObject {
             defer: false
         )
         hp.isFloatingPanel = true
+        hp.isRestorable = false
         hp.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue)
         hp.collectionBehavior = Self.shelfCollectionBehavior
         hp.backgroundColor = .clear

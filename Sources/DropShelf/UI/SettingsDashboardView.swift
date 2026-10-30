@@ -160,6 +160,39 @@ struct SettingsDashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
 
+            VStack(alignment: .leading, spacing: 5.5) {
+                MacCompactStartupCheckbox(
+                    id: "sidebar_launch_at_login",
+                    title: "Khởi động cùng macOS",
+                    isChecked: settings.launchAtLogin,
+                    helpText: "Tự động chạy DropShelf ngay khi đăng nhập vào máy Mac",
+                    settings: settings
+                ) {
+                    settings.launchAtLogin.toggle()
+                }
+
+                MacCompactStartupCheckbox(
+                    id: "sidebar_open_settings_on_launch",
+                    title: "Bật bảng này khi khởi động",
+                    isChecked: settings.openSettingsOnLaunch,
+                    helpText: "Tự động mở bảng Cài đặt này khi khởi động ứng dụng (bỏ chọn để chạy ngầm)",
+                    settings: settings
+                ) {
+                    settings.openSettingsOnLaunch.toggle()
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.045))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.7)
+            )
+
             HStack(spacing: 6) {
                 Circle()
                     .fill(panelController.isVisible ? Color.green : Color.secondary.opacity(0.55))
@@ -170,7 +203,7 @@ struct SettingsDashboardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .padding(.top, 2)
+            .padding(.top, 1)
 
             Button {
                 panelController.toggleShelf()
@@ -292,6 +325,28 @@ struct SettingsDashboardView: View {
                 Toggle(isOn: $settings.isShelfPinned) {
                     Text("Ghim giữ Kệ luôn hiển thị")
                     Text("Giữ cửa sổ Kệ cố định trên màn hình và bỏ qua bộ đếm tự ẩn khi Kệ trống.")
+                }
+            }
+
+            Section("Khởi động & Thanh Dock") {
+                Toggle(isOn: $settings.launchAtLogin) {
+                    Text("Khởi động cùng macOS")
+                    Text("Tự động chạy DropShelf ngay khi bạn đăng nhập vào máy Mac.")
+                }
+
+                Toggle(isOn: $settings.openShelfOnLaunch) {
+                    Text("Bật bảng Kệ nổi khi khởi động")
+                    Text("Tự động hiện Kệ nổi ở cạnh màn hình ngay khi mở ứng dụng.")
+                }
+
+                Toggle(isOn: $settings.openSettingsOnLaunch) {
+                    Text("Bật bảng Cài đặt này khi khởi động")
+                    Text("Tắt tuỳ chọn này nếu muốn ứng dụng khởi động êm ở nền không mở bảng Cài đặt.")
+                }
+
+                Toggle(isOn: $settings.showInDock) {
+                    Text("Hiển thị biểu tượng trên thanh Dock")
+                    Text("Khi tắt, DropShelf ẩn hoàn toàn khỏi thanh Dock ngay từ lúc khởi động, chỉ hiện trên Menu Bar.")
                 }
             }
 
@@ -737,18 +792,23 @@ struct SettingsDashboardView: View {
             Section("Thanh Dock & Menu Bar") {
                 Toggle(isOn: $settings.showInDock) {
                     Text("Hiển thị biểu tượng trên thanh Dock")
-                    Text("Khi tắt, DropShelf ẩn khỏi thanh Dock và ⌘Tab, chỉ hiện gọn trên thanh Menu Bar.")
+                    Text("Khi tắt, DropShelf ẩn hoàn toàn khỏi thanh Dock và ⌘Tab ngay cả khi tắt đi mở lại, chỉ hiện trên thanh Menu Bar.")
                 }
             }
 
             Section("Khởi động cùng hệ thống") {
                 Toggle(isOn: $settings.launchAtLogin) {
-                    Text("Tự khởi động cùng macOS")
+                    Text("Khởi động cùng macOS")
                     Text("Tự động chạy nền sẵn sàng ngay khi bạn đăng nhập vào máy Mac.")
                 }
 
+                Toggle(isOn: $settings.openShelfOnLaunch) {
+                    Text("Bật bảng Kệ nổi khi khởi động")
+                    Text("Tự động mở bảng Kệ nổi ở cạnh màn hình ngay khi khởi động DropShelf.")
+                }
+
                 Toggle(isOn: $settings.openSettingsOnLaunch) {
-                    Text("Mở cửa sổ Cài đặt khi khởi động ứng dụng")
+                    Text("Bật bảng Cài đặt này khi khởi động")
                     Text("Tắt tuỳ chọn này nếu bạn muốn ứng dụng khởi động hoàn toàn im lặng ở nền.")
                 }
 
@@ -787,6 +847,7 @@ struct SettingsDashboardView: View {
         rm -rf "$DST_APP"
         /usr/bin/ditto --noextattr "$SRC_APP" "$DST_APP"
         /usr/bin/xattr -cr "$DST_APP" 2>/dev/null || true
+        /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DST_APP" 2>/dev/null || true
         /usr/bin/open "$DST_APP"
         """
 

@@ -19,14 +19,20 @@ final class DropShelfApplication: NSApplication {
 
 @main
 enum DropShelfMain {
+    @MainActor private static var retainedDelegate: AppDelegate?
+
     static func main() {
-        let app = DropShelfApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
         MainActor.assumeIsolated {
+            UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            NSWindow.allowsAutomaticWindowTabbing = false
+
+            let app = DropShelfApplication.shared
+            let delegate = AppDelegate()
+            retainedDelegate = delegate
+            app.delegate = delegate
             delegate.installMainMenu()
+            app.run()
         }
-        app.run()
     }
 }
 
@@ -135,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
+        purgeLegacySavedWindowStateIfNeeded()
 
         if let bundleID = Bundle.main.bundleIdentifier {
             let ownPID = ProcessInfo.processInfo.processIdentifier
@@ -175,6 +182,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
             UpdateCheckerService.shared.checkSilentlyOnLaunchIfNeeded()
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        AppSettings.shared.refreshLaunchAtLoginStatus()
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        false
+    }
+
+    private func purgeLegacySavedWindowStateIfNeeded() {
+        if let libURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
+            let savedStateURL = libURL
+                .appendingPathComponent("Saved Application State", isDirectory: true)
+                .appendingPathComponent("com.hunglx.DropShelf.savedState", isDirectory: true)
+            try? FileManager.default.removeItem(at: savedStateURL)
         }
     }
 
@@ -224,6 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             win.titleVisibility = .hidden
             win.toolbarStyle = .unified
             win.isReleasedWhenClosed = false
+            win.isRestorable = false
             win.delegate = self
             win.minSize = NSSize(width: 720, height: 500)
             win.setContentSize(NSSize(width: 780, height: 560))
@@ -251,6 +276,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let win = settingsWindow else { return }
         NSApp.activate(ignoringOtherApps: true)
         win.makeKeyAndOrderFront(nil)
+        win.orderFrontRegardless()
     }
 
     // MARK: - Menu Actions

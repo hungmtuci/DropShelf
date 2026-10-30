@@ -314,6 +314,7 @@ struct HotKeyBinding: Codable, Equatable, Sendable {
 private struct PersistedSettingsPayload: Codable, Sendable {
     var initialized: Bool = true
     var showInDock: Bool = true
+    var openShelfOnLaunch: Bool = true
     var openSettingsOnLaunch: Bool = true
     var edgePosition: ShelfEdgePosition = .rightCenter
     var displayMode: ShelfDisplayMode = .followActiveScreen
@@ -339,6 +340,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     init(
         initialized: Bool = true,
         showInDock: Bool = true,
+        openShelfOnLaunch: Bool = true,
         openSettingsOnLaunch: Bool = true,
         edgePosition: ShelfEdgePosition = .rightCenter,
         displayMode: ShelfDisplayMode = .followActiveScreen,
@@ -363,6 +365,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
     ) {
         self.initialized = initialized
         self.showInDock = showInDock
+        self.openShelfOnLaunch = openShelfOnLaunch
         self.openSettingsOnLaunch = openSettingsOnLaunch
         self.edgePosition = edgePosition
         self.displayMode = displayMode
@@ -390,6 +393,7 @@ private struct PersistedSettingsPayload: Codable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         initialized = try c.decodeIfPresent(Bool.self, forKey: .initialized) ?? true
         showInDock = try c.decodeIfPresent(Bool.self, forKey: .showInDock) ?? true
+        openShelfOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .openShelfOnLaunch) ?? true
         openSettingsOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .openSettingsOnLaunch) ?? true
         edgePosition = try c.decodeIfPresent(ShelfEdgePosition.self, forKey: .edgePosition) ?? .rightCenter
         displayMode = try c.decodeIfPresent(ShelfDisplayMode.self, forKey: .displayMode) ?? .followActiveScreen
@@ -430,6 +434,13 @@ final class AppSettings: ObservableObject {
         didSet {
             guard launchAtLogin != oldValue, !isSyncingLaunchAtLogin else { return }
             applyLaunchAtLogin()
+        }
+    }
+
+    @Published var openShelfOnLaunch: Bool {
+        didSet {
+            guard openShelfOnLaunch != oldValue else { return }
+            saveSettingsAsync()
         }
     }
 
@@ -566,6 +577,7 @@ final class AppSettings: ObservableObject {
 
     @Published var selectedSettingsTab: SettingsSidebarTab = .general
     @Published var statusBannerMessage: String = ""
+    @Published var hoveredQuickOptionID: String? = nil
 
     var customFloatingX: Double?
     var customFloatingY: Double?
@@ -606,6 +618,7 @@ final class AppSettings: ObservableObject {
         }()
 
         self.showInDock = loaded.showInDock
+        self.openShelfOnLaunch = loaded.openShelfOnLaunch
         self.openSettingsOnLaunch = loaded.openSettingsOnLaunch
         self.edgePosition = loaded.edgePosition
         self.displayMode = loaded.displayMode
@@ -627,16 +640,20 @@ final class AppSettings: ObservableObject {
         self.customFloatingY = loaded.customFloatingY
         self.customFloatingRelX = loaded.customFloatingRelX
         self.customFloatingRelY = loaded.customFloatingRelY
-        self.launchAtLogin = (SMAppService.mainApp.status == .enabled)
+        let loginStatus = SMAppService.mainApp.status
+        self.launchAtLogin = (loginStatus == .enabled || loginStatus == .requiresApproval)
     }
 
     func applyDockVisibilityPolicy() {
         let wasSettingsVisible = AppDelegate.shared?.isSettingsWindowVisible ?? false
         let wasShelfVisible = ShelfPanelController.shared.isVisible
+        let targetPolicy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
 
-        NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
+        if NSApp.activationPolicy() != targetPolicy {
+            NSApp.setActivationPolicy(targetPolicy)
+        }
 
-        DispatchQueue.main.async {
+        let restoreWindows: @MainActor () -> Void = {
             ShelfPanelController.shared.reapplySpaceCollectionBehavior()
             if wasShelfVisible {
                 ShelfPanelController.shared.ensureFront()
@@ -645,28 +662,51 @@ final class AppSettings: ObservableObject {
                 AppDelegate.shared?.bringSettingsWindowToFront()
             }
         }
+
+        DispatchQueue.main.async {
+            restoreWindows()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            restoreWindows()
+        }
     }
 
     func refreshLaunchAtLoginStatus() {
+        let status = SMAppService.mainApp.status
+        let isRegistered = (status == .enabled || status == .requiresApproval)
+        guard launchAtLogin != isRegistered else { return }
         isSyncingLaunchAtLogin = true
-        launchAtLogin = (SMAppService.mainApp.status == .enabled)
+        launchAtLogin = isRegistered
         isSyncingLaunchAtLogin = false
     }
 
     private func applyLaunchAtLogin() {
+        let requestedEnable = launchAtLogin
         do {
-            if launchAtLogin {
-                try SMAppService.mainApp.register()
-                statusBannerMessage = "Đã bật Tự khởi động DropShelf cùng macOS."
+            if requestedEnable {
+                if SMAppService.mainApp.status != .enabled {
+                    try SMAppService.mainApp.register()
+                }
+                statusBannerMessage = "Đã bật Khởi động cùng macOS."
             } else {
                 try SMAppService.mainApp.unregister()
-                statusBannerMessage = "Đã tắt Tự khởi động cùng macOS."
+                statusBannerMessage = "Đã tắt Khởi động cùng macOS."
             }
         } catch {
-            isSyncingLaunchAtLogin = true
-            launchAtLogin = (SMAppService.mainApp.status == .enabled)
-            isSyncingLaunchAtLogin = false
             statusBannerMessage = "Lưu ý: Cài đặt DropShelf vào /Applications để bật Khởi động cùng macOS."
+        }
+
+        let status = SMAppService.mainApp.status
+        if requestedEnable && status == .requiresApproval {
+            SMAppService.openSystemSettingsLoginItems()
+            statusBannerMessage = "Vui lòng xác nhận cho phép DropShelf trong Cài đặt Hệ thống → Mục đăng nhập."
+        }
+
+        let actualRegistered = (status == .enabled || status == .requiresApproval)
+        if launchAtLogin != actualRegistered {
+            isSyncingLaunchAtLogin = true
+            launchAtLogin = actualRegistered
+            isSyncingLaunchAtLogin = false
         }
     }
 
@@ -682,6 +722,7 @@ final class AppSettings: ObservableObject {
         let payload = PersistedSettingsPayload(
             initialized: true,
             showInDock: showInDock,
+            openShelfOnLaunch: openShelfOnLaunch,
             openSettingsOnLaunch: openSettingsOnLaunch,
             edgePosition: edgePosition,
             displayMode: displayMode,

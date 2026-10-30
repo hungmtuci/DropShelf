@@ -43,6 +43,8 @@ struct ShelfPanelView: View {
                     entriesScrollList
                 }
 
+                startupOptionsCard
+
                 footerBar
             }
             .padding(11)
@@ -343,6 +345,45 @@ struct ShelfPanelView: View {
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.primary.opacity(0.035))
+        )
+    }
+
+    // MARK: - Startup Quick Checkboxes
+
+    private var startupOptionsCard: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            MacCompactStartupCheckbox(
+                id: "shelf_launch_at_login",
+                title: "Khởi động cùng macOS",
+                isChecked: settings.launchAtLogin,
+                helpText: "Tự động khởi chạy DropShelf sẵn sàng ngay khi đăng nhập vào máy Mac",
+                settings: settings
+            ) {
+                panelController.cancelEmptyAutoHideTimer()
+                settings.launchAtLogin.toggle()
+            }
+
+            MacCompactStartupCheckbox(
+                id: "shelf_open_on_launch",
+                title: "Bật bảng này khi khởi động",
+                isChecked: settings.openShelfOnLaunch,
+                helpText: "Tự động mở bảng Kệ nổi này ngay khi khởi động DropShelf (bỏ chọn để ẩn gọn trên Menu Bar)",
+                settings: settings
+            ) {
+                panelController.cancelEmptyAutoHideTimer()
+                settings.openShelfOnLaunch.toggle()
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 0.7)
         )
     }
 
@@ -709,5 +750,66 @@ private struct ShelfEntryCardView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+}
+
+struct MacCompactStartupCheckbox: View {
+    let id: String
+    let title: String
+    let isChecked: Bool
+    let helpText: String
+    @ObservedObject var settings: AppSettings
+    let action: () -> Void
+
+    private var isHovered: Bool {
+        settings.hoveredQuickOptionID == id
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6.5) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 3.8, style: .continuous)
+                        .fill(isChecked ? Color.accentColor : Color.primary.opacity(isHovered ? 0.12 : 0.06))
+                        .frame(width: 13.5, height: 13.5)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 3.8, style: .continuous)
+                                .strokeBorder(
+                                    isChecked ? Color.accentColor : Color.primary.opacity(0.28),
+                                    lineWidth: 0.9
+                                )
+                        )
+
+                    if isChecked {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 8.5, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+
+                Text(title)
+                    .font(.system(size: 11, weight: isChecked ? .medium : .regular))
+                    .foregroundStyle(isChecked ? Color.primary : Color.secondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 3)
+            .padding(.vertical, 1.5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.primary.opacity(isHovered ? 0.06 : 0.0))
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering {
+                settings.hoveredQuickOptionID = id
+            } else if settings.hoveredQuickOptionID == id {
+                settings.hoveredQuickOptionID = nil
+            }
+        }
+        .help(helpText)
     }
 }

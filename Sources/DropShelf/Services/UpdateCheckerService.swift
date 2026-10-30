@@ -44,7 +44,7 @@ final class UpdateCheckerService: ObservableObject {
     private var periodicCheckTimer: Timer?
 
     var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.4.0"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.5.0"
     }
 
     var availableVersion: String? {
@@ -332,6 +332,7 @@ final class UpdateCheckerService: ObservableObject {
         rm -rf "$DST_APP"
         /usr/bin/ditto --noextattr "$SRC_APP" "$DST_APP"
         /usr/bin/xattr -cr "$DST_APP" 2>/dev/null || true
+        /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DST_APP" 2>/dev/null || true
         /usr/bin/open "$DST_APP"
         rm -rf "$STAGE_DIR"
         """
