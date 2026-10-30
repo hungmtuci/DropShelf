@@ -29,10 +29,21 @@ final class UpdateCheckerService: ObservableObject {
         let browser_download_url: String
     }
 
-    @Published private(set) var state: UpdateState = .idle
+    @Published private(set) var state: UpdateState = .idle {
+        didSet {
+            StatusBarController.shared.refreshBadge()
+        }
+    }
+    @Published private(set) var shelfBadgeFeedback: String? = nil
+    @Published private(set) var latestRemoteVersion: String? = nil
+    @Published private(set) var latestRemoteZipURL: URL? = nil
+    @Published private(set) var lastCheckedDate: Date? = nil
+
+    private var feedbackResetWorkItem: DispatchWorkItem?
+    private var periodicCheckTimer: Timer?
 
     var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.2.0"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.3.0"
     }
 
     var availableVersion: String? {
@@ -52,37 +63,91 @@ final class UpdateCheckerService: ObservableObject {
     }
 
     private var lastAutoCheckTimestamp: CFAbsoluteTime = 0
-    private let latestReleaseAPI = URL(string: "https://api.github.com/repos/hungmtuci/DropShelf/releases/latest")!
+    private let latestReleaseAPIBase = "https://api.github.com/repos/hungmtuci/DropShelf/releases/latest"
     private let releasesPageFallback = URL(string: "https://github.com/hungmtuci/DropShelf/releases/latest")!
 
     private init() {}
 
     func checkSilentlyOnLaunchIfNeeded() {
+        startPeriodicBackgroundCheckIfNeeded()
         let now = CFAbsoluteTimeGetCurrent()
-        guard (now - lastAutoCheckTimestamp) >= 21_600 else { return }
+        guard (now - lastAutoCheckTimestamp) >= 14_400 else { return }
         lastAutoCheckTimestamp = now
         Task { @MainActor in
-            await performCheck(manual: false)
+            await performCheck(manual: false, autoInstallIfNewer: false, forceReinstall: false)
         }
     }
 
-    func checkForUpdatesManually() {
+    private func startPeriodicBackgroundCheckIfNeeded() {
+        guard periodicCheckTimer == nil else { return }
+        periodicCheckTimer = Timer.scheduledTimer(withTimeInterval: 14_400, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.performCheck(manual: false, autoInstallIfNewer: false, forceReinstall: false)
+            }
+        }
+    }
+
+    /// 1-click GitHub Update:
+    /// - If an update is already known to be available -> immediately downloads & installs it.
+    /// - Otherwise queries GitHub Releases -> if a newer version exists, immediately downloads, installs & relaunches;
+    ///   if already on the latest version, displays instant confirmation.
+    func oneClickUpdateFromGitHub() {
+        guard !isBusy else { return }
+
+        if case .available = state {
+            installAvailableUpdate()
+            return
+        }
+
         Task { @MainActor in
-            await performCheck(manual: true)
+            await performCheck(manual: true, autoInstallIfNewer: true, forceReinstall: false)
         }
     }
 
-    private func performCheck(manual: Bool) async {
+    /// Checks GitHub Releases without auto-installing (updates status state).
+    func checkForUpdatesManually() {
+        guard !isBusy else { return }
+        Task { @MainActor in
+            await performCheck(manual: true, autoInstallIfNewer: false, forceReinstall: false)
+        }
+    }
+
+    /// Forces pulling and reinstalling the latest release `.zip` from GitHub even if version numbers match.
+    func reinstallLatestFromGitHub() {
+        guard !isBusy else { return }
+        Task { @MainActor in
+            await performCheck(manual: true, autoInstallIfNewer: true, forceReinstall: true)
+        }
+    }
+
+    private func setTransientShelfFeedback(_ message: String, duration: TimeInterval = 4.5) {
+        feedbackResetWorkItem?.cancel()
+        shelfBadgeFeedback = message
+        let work = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                self?.shelfBadgeFeedback = nil
+            }
+        }
+        feedbackResetWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+
+    private func performCheck(manual: Bool, autoInstallIfNewer: Bool, forceReinstall: Bool) async {
         guard !isBusy else { return }
 
         if manual {
+            feedbackResetWorkItem?.cancel()
+            shelfBadgeFeedback = nil
             state = .checking
-            AppSettings.shared.statusBannerMessage = "Đang kiểm tra phiên bản mới từ GitHub Releases..."
+            AppSettings.shared.statusBannerMessage = "Đang kết nối GitHub Releases (hungmtuci/DropShelf) để kiểm tra bản cập nhật..."
         }
 
-        var req = URLRequest(url: latestReleaseAPI)
-        req.timeoutInterval = 12
-        req.cachePolicy = .reloadIgnoringLocalCacheData
+        let cacheBuster = Int(Date().timeIntervalSince1970)
+        let requestURL = URL(string: "\(latestReleaseAPIBase)?t=\(cacheBuster)") ?? URL(string: latestReleaseAPIBase)!
+
+        var req = URLRequest(url: requestURL)
+        req.timeoutInterval = 15
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("DropShelf/\(currentVersion)", forHTTPHeaderField: "User-Agent")
 
@@ -90,8 +155,9 @@ final class UpdateCheckerService: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 if manual {
-                    let msg = "Không kết nối được GitHub Releases. Vui lòng thử lại sau."
+                    let msg = "Không kết nối được GitHub Releases. Vui lòng kiểm tra mạng và thử lại."
                     state = .failed(message: msg)
+                    setTransientShelfFeedback("Lỗi kết nối GitHub")
                     AppSettings.shared.statusBannerMessage = msg
                 }
                 return
@@ -105,27 +171,37 @@ final class UpdateCheckerService: ObservableObject {
                 .first(where: { $0.name.lowercased().hasSuffix(".zip") })
                 .flatMap { URL(string: $0.browser_download_url) }
 
+            latestRemoteVersion = remoteVersion
+            latestRemoteZipURL = zipAssetURL
+            lastCheckedDate = Date()
+
             let localVer = currentVersion
-            if Self.isVersion(remoteVersion, newerThan: localVer) {
+            let isNewer = Self.isVersion(remoteVersion, newerThan: localVer)
+
+            if isNewer || forceReinstall {
                 state = .available(
                     version: remoteVersion,
                     zipURL: zipAssetURL,
                     releasePageURL: pageURL,
                     releaseNotes: decoded.body
                 )
-                if manual {
-                    AppSettings.shared.statusBannerMessage = "Đã có phiên bản mới DropShelf v\(remoteVersion)! Nhấn 'Cập nhật v\(remoteVersion)' để tự động cài đặt."
+                if autoInstallIfNewer {
+                    downloadAndInstall(version: remoteVersion, zipURL: zipAssetURL, releasePageURL: pageURL)
+                } else if manual {
+                    AppSettings.shared.statusBannerMessage = "Đã có phiên bản mới DropShelf v\(remoteVersion) trên GitHub! Nhấn 'Update qua GitHub (v\(remoteVersion))' để cài đặt."
                 }
             } else {
                 state = .upToDate(version: localVer)
                 if manual {
-                    AppSettings.shared.statusBannerMessage = "Bạn đang sử dụng phiên bản DropShelf mới nhất (v\(localVer))."
+                    setTransientShelfFeedback("✓ Mới nhất v\(localVer)")
+                    AppSettings.shared.statusBannerMessage = "✓ Đã kiểm tra từ GitHub: Bạn đang sử dụng phiên bản mới nhất (v\(localVer))."
                 }
             }
         } catch {
             if manual {
-                let msg = "Không thể kiểm tra cập nhật (\(error.localizedDescription))."
+                let msg = "Không thể kiểm tra cập nhật từ GitHub (\(error.localizedDescription))."
                 state = .failed(message: msg)
+                setTransientShelfFeedback("Lỗi kiểm tra GitHub")
                 AppSettings.shared.statusBannerMessage = msg
             }
         }
@@ -133,14 +209,19 @@ final class UpdateCheckerService: ObservableObject {
 
     func installAvailableUpdate() {
         guard case let .available(version, zipURL, releasePageURL, _) = state else { return }
+        downloadAndInstall(version: version, zipURL: zipURL, releasePageURL: releasePageURL)
+    }
 
+    private func downloadAndInstall(version: String, zipURL: URL?, releasePageURL: URL) {
         guard let downloadURL = zipURL else {
             NSWorkspace.shared.open(releasePageURL)
             return
         }
 
+        feedbackResetWorkItem?.cancel()
+        shelfBadgeFeedback = nil
         state = .downloading(version: version)
-        AppSettings.shared.statusBannerMessage = "Đang tải DropShelf v\(version) từ GitHub Releases..."
+        AppSettings.shared.statusBannerMessage = "Đang tải gói cập nhật DropShelf v\(version) trực tiếp từ GitHub Releases..."
 
         Task { @MainActor in
             let stageDir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -152,7 +233,8 @@ final class UpdateCheckerService: ObservableObject {
                 try FileManager.default.createDirectory(at: extractDir, withIntermediateDirectories: true)
 
                 var req = URLRequest(url: downloadURL)
-                req.timeoutInterval = 60
+                req.timeoutInterval = 90
+                req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
                 req.setValue("DropShelf/\(currentVersion)", forHTTPHeaderField: "User-Agent")
 
                 let (tempDownloadedURL, response) = try await URLSession.shared.download(for: req)
@@ -168,7 +250,7 @@ final class UpdateCheckerService: ObservableObject {
                 try FileManager.default.moveItem(at: tempDownloadedURL, to: zipDest)
 
                 state = .installing(version: version)
-                AppSettings.shared.statusBannerMessage = "Đang giải nén và cài đặt DropShelf v\(version)..."
+                AppSettings.shared.statusBannerMessage = "Đang giải nén, gỡ Gatekeeper và nâng cấp lên DropShelf v\(version)..."
 
                 let extractedAppURL = try await Self.extractAndValidateZipOffMain(
                     zipPath: zipDest.path,
@@ -195,8 +277,9 @@ final class UpdateCheckerService: ObservableObject {
                 NSApp.terminate(nil)
             } catch {
                 try? FileManager.default.removeItem(at: stageDir)
-                let msg = "Cập nhật tự động thất bại: \(error.localizedDescription) — đang mở trang tải thủ công..."
+                let msg = "Cập nhật tự động thất bại: \(error.localizedDescription) — đang mở trang tải GitHub..."
                 state = .failed(message: msg)
+                setTransientShelfFeedback("Lỗi tải bản mới")
                 AppSettings.shared.statusBannerMessage = msg
                 NSWorkspace.shared.open(releasePageURL)
             }

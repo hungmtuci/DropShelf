@@ -60,9 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             keyEquivalent: "y"
         ).target = self
         appMenu.addItem(
-            withTitle: "Kiểm tra cập nhật từ GitHub...",
+            withTitle: "Update qua GitHub...",
             action: #selector(checkUpdatesFromMenu),
-            keyEquivalent: ""
+            keyEquivalent: "u"
         ).target = self
         appMenu.addItem(.separator())
         appMenu.addItem(
@@ -261,7 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func checkUpdatesFromMenu() {
         showSettingsWindow()
-        UpdateCheckerService.shared.checkForUpdatesManually()
+        UpdateCheckerService.shared.oneClickUpdateFromGitHub()
     }
 
     @objc private func pasteToShelfFromMenu() {

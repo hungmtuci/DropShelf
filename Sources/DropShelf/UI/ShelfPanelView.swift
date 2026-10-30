@@ -24,6 +24,7 @@ struct ShelfPanelView: View {
     @ObservedObject var store: ShelfStore
     @ObservedObject var settings: AppSettings
     @ObservedObject var panelController: ShelfPanelController
+    @ObservedObject var updateService: UpdateCheckerService
 
     var body: some View {
         ZStack {
@@ -31,6 +32,10 @@ struct ShelfPanelView: View {
 
             VStack(spacing: 8) {
                 headerBar
+
+                if let newVer = updateService.availableVersion {
+                    availableUpdateBanner(version: newVer)
+                }
 
                 dropTargetBanner
 
@@ -52,6 +57,45 @@ struct ShelfPanelView: View {
                     lineWidth: panelController.isIncomingDragTargeted ? 2.2 : 1.0
                 )
         )
+    }
+
+    private func availableUpdateBanner(version: String) -> some View {
+        Button {
+            panelController.cancelEmptyAutoHideTimer()
+            updateService.oneClickUpdateFromGitHub()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("Bản mới v\(version) trên GitHub")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text("Update")
+                    .font(.system(size: 10, weight: .bold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.24))
+                    .foregroundStyle(.white)
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.green.opacity(0.92), Color.teal.opacity(0.92)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .help("Nhấn để tự động tải và cập nhật DropShelf v\(version) từ GitHub Releases")
     }
 
     // MARK: - Header
@@ -301,82 +345,165 @@ struct ShelfPanelView: View {
     // MARK: - Footer
 
     private var footerBar: some View {
-        HStack(spacing: 6) {
+        VStack(spacing: 6) {
             if store.entries.count > 1 {
-                ZStack {
-                    HStack(spacing: 5) {
-                        Image(systemName: "hand.draw.fill")
-                            .font(.system(size: 10.5, weight: .semibold))
-                        Text("Kéo tất cả (\(store.totalFileCount))")
-                            .font(.system(size: 11, weight: .semibold))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.16))
-                    .foregroundStyle(Color.accentColor)
-                    .clipShape(Capsule())
-                    .overlay(
-                        ShelfDragSourceRepresentable(
-                            entriesToDrag: store.entries,
-                            primaryEntry: nil,
-                            showContextMenu: false
+                HStack(spacing: 6) {
+                    ZStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "hand.draw.fill")
+                                .font(.system(size: 10.5, weight: .semibold))
+                            Text("Kéo tất cả (\(store.totalFileCount))")
+                                .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.16))
+                        .foregroundStyle(Color.accentColor)
+                        .clipShape(Capsule())
+                        .overlay(
+                            ShelfDragSourceRepresentable(
+                                entriesToDrag: store.entries,
+                                primaryEntry: nil,
+                                showContextMenu: false
+                            )
                         )
-                    )
-                }
-                .help("Nhấn giữ và kéo nút này để kéo toàn bộ các tệp trên kệ ra cùng lúc")
-
-                Spacer(minLength: 2)
-
-                if panelController.availableDisplays.count > 1 {
-                    quickSwitchDisplayButton
-                }
-
-                Button {
-                    store.combineAllIntoStack()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.stack.3d.up.fill")
-                            .font(.system(size: 10))
-                        Text("Gộp Stack")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.07))
-                    .clipShape(Capsule())
+                    .help("Nhấn giữ và kéo nút này để kéo toàn bộ các tệp trên kệ ra cùng lúc")
+
+                    Spacer(minLength: 2)
+
+                    Button {
+                        store.combineAllIntoStack()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                                .font(.system(size: 10))
+                            Text("Gộp Stack")
+                                .font(.system(size: 10.5, weight: .medium))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.primary.opacity(0.07))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Gộp tất cả các mục hiện có trên kệ thành 1 nhóm Stack")
                 }
-                .buttonStyle(.plain)
-                .help("Gộp tất cả các mục hiện có trên kệ thành 1 nhóm Stack")
-            } else {
-                Text("Giữ ⌥ kéo: Sao chép • Space: Xem nhanh")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            }
+
+            HStack(spacing: 6) {
+                shelfGitHubUpdateButton
+
                 Spacer(minLength: 4)
 
                 if panelController.availableDisplays.count > 1 {
                     quickSwitchDisplayButton
+                } else {
+                    Text("v\(updateService.currentVersion)")
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .padding(.horizontal, 4)
     }
 
+    @ViewBuilder
+    private var shelfGitHubUpdateButton: some View {
+        let config = shelfUpdateButtonStyle
+        Button {
+            panelController.cancelEmptyAutoHideTimer()
+            updateService.oneClickUpdateFromGitHub()
+            panelController.scheduleEmptyAutoHideIfNeeded()
+        } label: {
+            HStack(spacing: 4.5) {
+                Image(systemName: config.symbol)
+                    .font(.system(size: 10, weight: .bold))
+                Text(config.title)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(config.bgColor)
+            .foregroundStyle(config.fgColor)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(updateService.isBusy)
+        .help("Kiểm tra và tự động cập nhật phiên bản mới trực tiếp từ GitHub Releases (hungmtuci/DropShelf)")
+    }
+
+    private var shelfUpdateButtonStyle: (title: String, symbol: String, bgColor: Color, fgColor: Color) {
+        switch updateService.state {
+        case .available(let ver, _, _, _):
+            return (
+                "Update GitHub v\(ver)",
+                "arrow.down.circle.fill",
+                Color.green.opacity(0.22),
+                Color.green
+            )
+        case .checking:
+            return (
+                "Đang kiểm tra GitHub...",
+                "arrow.triangle.2.circlepath",
+                Color.accentColor.opacity(0.14),
+                Color.accentColor
+            )
+        case .downloading(let ver):
+            return (
+                "Đang tải v\(ver)...",
+                "arrow.down.circle",
+                Color.accentColor.opacity(0.16),
+                Color.accentColor
+            )
+        case .installing(let ver):
+            return (
+                "Đang cài v\(ver)...",
+                "gearshape.2.fill",
+                Color.orange.opacity(0.18),
+                Color.orange
+            )
+        default:
+            if let feedback = updateService.shelfBadgeFeedback {
+                return (
+                    feedback,
+                    feedback.hasPrefix("✓") ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                    feedback.hasPrefix("✓") ? Color.green.opacity(0.16) : Color.orange.opacity(0.16),
+                    feedback.hasPrefix("✓") ? Color.green : Color.orange
+                )
+            }
+            return (
+                "Update qua GitHub",
+                "arrow.triangle.2.circlepath.circle.fill",
+                Color.primary.opacity(0.08),
+                Color.primary.opacity(0.82)
+            )
+        }
+    }
+
     private var quickSwitchDisplayButton: some View {
         Button {
             panelController.cycleToNextScreen()
         } label: {
-            Image(systemName: "display.2")
-                .font(.system(size: 10.5, weight: .semibold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.08))
-                .foregroundStyle(.secondary)
-                .clipShape(Capsule())
+            HStack(spacing: 4) {
+                Image(systemName: "display.2")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("Đổi màn hình")
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(Color.primary.opacity(0.08))
+            .foregroundStyle(.secondary)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
         .help("Chuyển nhanh cửa sổ Kệ sang màn hình kia")

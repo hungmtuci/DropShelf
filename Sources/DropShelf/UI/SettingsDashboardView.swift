@@ -22,6 +22,8 @@ struct SettingsDashboardView: View {
                     statusBanner
                 }
 
+                githubUpdateFooterSection
+
                 screenshotAutoCaptureSection
 
                 dockAndStartupSection
@@ -29,8 +31,6 @@ struct SettingsDashboardView: View {
                 positionAndAutoTriggerSection
 
                 dragBehaviorAndShortcutsSection
-
-                githubUpdateFooterSection
             }
             .padding(22)
         }
@@ -134,10 +134,10 @@ struct SettingsDashboardView: View {
         switch updateService.state {
         case .available(let ver, _, _, _):
             Button {
-                updateService.installAvailableUpdate()
+                updateService.oneClickUpdateFromGitHub()
             } label: {
-                Label("Cập nhật v\(ver)", systemImage: "arrow.down.circle.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                Label("Update qua GitHub (v\(ver))", systemImage: "arrow.down.circle.fill")
+                    .font(.system(size: 11.5, weight: .bold))
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
@@ -145,9 +145,11 @@ struct SettingsDashboardView: View {
 
         case .checking:
             Button {} label: {
-                Label("Đang kiểm tra...", systemImage: "arrow.triangle.2.circlepath")
+                Label("Đang kiểm tra GitHub...", systemImage: "arrow.triangle.2.circlepath")
                     .font(.system(size: 11))
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.teal)
             .controlSize(.small)
             .disabled(true)
 
@@ -156,24 +158,41 @@ struct SettingsDashboardView: View {
                 Label("Đang tải v\(ver)...", systemImage: "arrow.down.circle")
                     .font(.system(size: 11))
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.teal)
             .controlSize(.small)
             .disabled(true)
 
         case .installing(let ver):
             Button {} label: {
-                Label("Đang cài v\(ver)...", systemImage: "gearshape.2")
+                Label("Đang cài v\(ver)...", systemImage: "gearshape.2.fill")
                     .font(.system(size: 11))
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
             .controlSize(.small)
             .disabled(true)
 
+        case .upToDate(let ver):
+            Button {
+                updateService.oneClickUpdateFromGitHub()
+            } label: {
+                Label("✓ Đã mới nhất (v\(ver)) • Kiểm tra lại", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .controlSize(.small)
+
         default:
             Button {
-                updateService.checkForUpdatesManually()
+                updateService.oneClickUpdateFromGitHub()
             } label: {
-                Label("Kiểm tra cập nhật", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 11))
+                Label("Update qua GitHub", systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                    .font(.system(size: 11.5, weight: .semibold))
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.teal)
             .controlSize(.small)
         }
     }
@@ -700,36 +719,64 @@ struct SettingsDashboardView: View {
         }
     }
 
-    // MARK: - 6. GitHub Releases Auto-Update Section
+    // MARK: - GitHub Releases 1-Click Auto-Update Section
 
     private var githubUpdateFooterSection: some View {
         sectionContainer(
-            title: "CẬP NHẬT PHIÊN BẢN TỪ GITHUB RELEASES",
-            icon: "arrow.triangle.2.circlepath.circle"
+            title: "UPDATE TỰ ĐỘNG QUA GITHUB RELEASES (1 CHẠM)",
+            icon: "arrow.triangle.2.circlepath.circle.fill"
         ) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Kho mã nguồn & Phát hành chính thức: github.com/hungmtuci/DropShelf")
-                        .font(.system(size: 12.5, weight: .semibold))
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text("Kho phát hành chính thức: github.com/hungmtuci/DropShelf")
+                                .font(.system(size: 12.5, weight: .semibold))
 
-                    Text(updateStatusDescription)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                }
+                            if let remoteVer = updateService.latestRemoteVersion {
+                                Text("GitHub: v\(remoteVer)")
+                                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(Color.teal.opacity(0.15))
+                                    .foregroundStyle(Color.teal)
+                                    .clipShape(Capsule())
+                            }
+                        }
 
-                Spacer()
-
-                Button {
-                    if let url = URL(string: "https://github.com/hungmtuci/DropShelf/releases") {
-                        NSWorkspace.shared.open(url)
+                        Text(updateStatusDescription)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                } label: {
-                    Label("Mở GitHub Releases", systemImage: "safari")
-                        .font(.system(size: 11.5))
-                }
-                .controlSize(.small)
 
-                updateActionButton
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Button {
+                            if let url = URL(string: "https://github.com/hungmtuci/DropShelf/releases/latest") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } label: {
+                            Label("Mở GitHub", systemImage: "safari")
+                                .font(.system(size: 11.5))
+                        }
+                        .controlSize(.small)
+
+                        if !updateService.isBusy {
+                            Button {
+                                updateService.reinstallLatestFromGitHub()
+                            } label: {
+                                Label("Tải & Cài lại từ GitHub", systemImage: "arrow.clockwise.circle")
+                                    .font(.system(size: 11.5))
+                            }
+                            .controlSize(.small)
+                            .help("Buộc tải lại gói .zip mới nhất từ GitHub Releases và cài đè ứng dụng hiện tại")
+                        }
+
+                        updateActionButton
+                    }
+                }
             }
         }
     }
@@ -737,15 +784,15 @@ struct SettingsDashboardView: View {
     private var updateStatusDescription: String {
         switch updateService.state {
         case .idle:
-            return "Tự động kiểm tra bản mới định kỳ trên GitHub và hỗ trợ cập nhật 1 chạm không cần cài lại thủ công."
+            return "Nhấn 'Update qua GitHub' để tự động kiểm tra, tải bản mới nhất, gỡ Gatekeeper và nâng cấp ngay (không cần cài thủ công)."
         case .checking:
             return "Đang kết nối tới GitHub Releases (hungmtuci/DropShelf)..."
         case .upToDate(let ver):
-            return "Bạn đang sử dụng phiên bản mới nhất v\(ver)."
+            return "✓ Bạn đang sử dụng phiên bản mới nhất trên GitHub (v\(ver))."
         case .available(let ver, _, _, _):
-            return "Đã phát hiện phiên bản mới v\(ver) trên GitHub! Nhấn 'Cập nhật v\(ver)' để tự động tải và nâng cấp."
+            return "Đã phát hiện phiên bản mới v\(ver) trên GitHub! Nhấn 'Update qua GitHub (v\(ver))' để tự động tải và nâng cấp."
         case .downloading(let ver):
-            return "Đang tải gói cập nhật DropShelf v\(ver)..."
+            return "Đang tải gói cập nhật DropShelf v\(ver) trực tiếp từ GitHub Releases..."
         case .installing(let ver):
             return "Đang giải nén, gỡ cờ Gatekeeper và thay thế phiên bản v\(ver)..."
         case .failed(let msg):

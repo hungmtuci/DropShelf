@@ -187,23 +187,13 @@ final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
-        if let newVer = updater.availableVersion {
-            let installItem = NSMenuItem(
-                title: "Tải & Cập nhật tự động v\(newVer)",
-                action: #selector(installUpdateAction),
-                keyEquivalent: ""
-            )
-            installItem.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
-            installItem.target = self
-            menu.addItem(installItem)
-        }
-
         let checkTitle: String = {
             switch updater.state {
-            case .checking: return "Đang kiểm tra cập nhật..."
-            case .downloading(let v): return "Đang tải v\(v)..."
+            case .available(let v, _, _, _): return "Update qua GitHub ngay (v\(v))"
+            case .checking: return "Đang kiểm tra GitHub..."
+            case .downloading(let v): return "Đang tải v\(v) từ GitHub..."
             case .installing(let v): return "Đang cài đặt v\(v)..."
-            default: return "Kiểm tra cập nhật từ GitHub..."
+            default: return "Update qua GitHub (Kiểm tra & Cập nhật ngay)"
             }
         }()
         let checkItem = NSMenuItem(
@@ -211,7 +201,7 @@ final class StatusBarController: NSObject {
             action: updater.isBusy ? nil : #selector(checkUpdatesAction),
             keyEquivalent: ""
         )
-        checkItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
+        checkItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath.circle.fill", accessibilityDescription: nil)
         checkItem.isEnabled = !updater.isBusy
         checkItem.target = self
         menu.addItem(checkItem)
@@ -281,13 +271,8 @@ final class StatusBarController: NSObject {
         AppSettings.shared.launchAtLogin.toggle()
     }
 
-    @objc private func installUpdateAction() {
-        UpdateCheckerService.shared.installAvailableUpdate()
-    }
-
     @objc private func checkUpdatesAction() {
-        AppDelegate.shared?.showSettingsWindow()
-        UpdateCheckerService.shared.checkForUpdatesManually()
+        UpdateCheckerService.shared.oneClickUpdateFromGitHub()
     }
 
     @objc private func openSettingsAction() {

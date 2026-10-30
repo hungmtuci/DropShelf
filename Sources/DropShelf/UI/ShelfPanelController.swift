@@ -78,7 +78,8 @@ final class ShelfPanelController: ObservableObject {
             rootView: ShelfPanelView(
                 store: ShelfStore.shared,
                 settings: AppSettings.shared,
-                panelController: self
+                panelController: self,
+                updateService: UpdateCheckerService.shared
             )
         )
         hosting.frame = dropContainer.bounds
@@ -504,8 +505,11 @@ final class ShelfPanelController: ObservableObject {
                       !AppSettings.shared.isShelfPinned else {
                     return
                 }
-                if self.isIncomingDragTargeted || DragMonitorService.shared.isSystemDragActive {
-                    self.scheduleEmptyTimer(after: 1.0)
+                if self.isIncomingDragTargeted
+                    || DragMonitorService.shared.isSystemDragActive
+                    || UpdateCheckerService.shared.isBusy
+                    || UpdateCheckerService.shared.shelfBadgeFeedback != nil {
+                    self.scheduleEmptyTimer(after: 1.5)
                     return
                 }
                 self.hideShelf()
@@ -659,8 +663,9 @@ final class ShelfPanelController: ObservableObject {
         let store = ShelfStore.shared
         let count = store.entries.count
         let headerHeight: CGFloat = 46
+        let updateBannerHeight: CGFloat = UpdateCheckerService.shared.availableVersion != nil ? 36 : 0
         let dropBannerHeight: CGFloat = count == 0 ? 156 : 58
-        let footerHeight: CGFloat = count > 1 ? 38 : 28
+        let footerHeight: CGFloat = count > 1 ? 64 : 32
 
         var cardsHeight: CGFloat = 0
         if count > 0 {
@@ -673,8 +678,8 @@ final class ShelfPanelController: ObservableObject {
             }
         }
 
-        let desiredHeight = headerHeight + dropBannerHeight + cardsHeight + footerHeight + 16
-        let height = min(max(desiredHeight, 228), min(560, vf.height - 32))
+        let desiredHeight = headerHeight + updateBannerHeight + dropBannerHeight + cardsHeight + footerHeight + 16
+        let height = min(max(desiredHeight, 236), min(580, vf.height - 32))
         let edgeMargin: CGFloat = 8
 
         let pos = AppSettings.shared.edgePosition
