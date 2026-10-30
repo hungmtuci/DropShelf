@@ -3,6 +3,36 @@ import AppKit
 import Carbon
 import ServiceManagement
 
+enum SettingsSidebarTab: String, CaseIterable, Identifiable, Sendable {
+    case general = "general"
+    case displayAndPosition = "display_position"
+    case screenshots = "screenshots"
+    case dragAndShortcuts = "drag_shortcuts"
+    case systemAndDock = "system_dock"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return "Tổng quan & Cập nhật"
+        case .displayAndPosition: return "Màn hình & Vị trí"
+        case .screenshots: return "Chụp màn hình"
+        case .dragAndShortcuts: return "Kéo thả & Phím tắt"
+        case .systemAndDock: return "Hệ thống & Dock"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .general: return "sparkles.rectangle.stack.fill"
+        case .displayAndPosition: return "display.2"
+        case .screenshots: return "camera.viewfinder"
+        case .dragAndShortcuts: return "hand.draw.fill"
+        case .systemAndDock: return "dock.rectangle"
+        }
+    }
+}
+
 enum ShelfEdgePosition: String, Codable, CaseIterable, Identifiable, Sendable {
     case rightTop = "right_top"
     case rightCenter = "right_center"
@@ -77,6 +107,14 @@ struct ConnectedDisplayInfo: Identifiable, Equatable {
     var detailedTitle: String {
         "Màn hình \(index): \(name) (\(resolutionText))"
     }
+
+    var symbolName: String {
+        let lower = name.lowercased()
+        if lower.contains("built-in") || lower.contains("tích hợp") || lower.contains("macbook") || lower.contains("internal") {
+            return "laptopcomputer"
+        }
+        return "display"
+    }
 }
 
 extension NSScreen {
@@ -99,22 +137,22 @@ enum AutoShowTrigger: String, Codable, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .immediateOnDrag:
-            return "Hiện ngay khi bắt đầu kéo tệp / nội dung (Chuẩn Yoink)"
+            return "Hiện ngay khi bắt đầu kéo"
         case .edgeOrShake:
-            return "Hiện khi kéo tới sát mép màn hình hoặc lắc chuột"
+            return "Khi kéo sát mép hoặc lắc chuột"
         case .manualOnly:
-            return "Chỉ mở thủ công bằng phím tắt / Menu Bar"
+            return "Chỉ mở bằng phím tắt / Menu Bar"
         }
     }
 
     var shortNote: String {
         switch self {
         case .immediateOnDrag:
-            return "Tự động trượt ra mỗi khi phát hiện thao tác kéo thực sự và tự ẩn sau 3s nếu không có nội dung."
+            return "Tự động trượt ra khi phát hiện thao tác kéo tệp và tự ẩn sau 3 giây nếu Kệ trống."
         case .edgeOrShake:
-            return "Giữ màn hình thoáng tối đa — chỉ trượt ra khi rê tệp lại gần cạnh kệ hoặc lắc nhẹ con trỏ chuột."
+            return "Chỉ trượt ra khi rê tệp tới sát cạnh Kệ hoặc lắc nhẹ con trỏ chuột."
         case .manualOnly:
-            return "Không tự bật khi kéo chuột; mở kệ bằng phím tắt toàn cục hoặc bấm icon trên Menu Bar."
+            return "Không tự mở khi kéo chuột; chỉ mở bằng phím tắt hoặc icon Menu Bar."
         }
     }
 }
@@ -130,10 +168,10 @@ enum EmptyAutoHideOption: Int, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .twoSeconds: return "2 giây"
-        case .threeSeconds: return "3 giây (Mặc định)"
-        case .fiveSeconds: return "5 giây"
-        case .eightSeconds: return "8 giây"
+        case .twoSeconds: return "Sau 2 giây"
+        case .threeSeconds: return "Sau 3 giây (Mặc định)"
+        case .fiveSeconds: return "Sau 5 giây"
+        case .eightSeconds: return "Sau 8 giây"
         case .disabled: return "Không tự ẩn"
         }
     }
@@ -148,9 +186,9 @@ enum DragOutBehavior: String, Codable, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .moveLikeFinder:
-            return "Di chuyển như Finder / Yoink (Giữ ⌥ Option để Sao chép)"
+            return "Di chuyển tệp như Finder (Giữ ⌥ để Sao chép)"
         case .copyByDefault:
-            return "Sao chép an toàn mặc định (Giữ ⌘ Command để Di chuyển)"
+            return "Sao chép mặc định (Giữ ⌘ để Di chuyển)"
         }
     }
 }
@@ -526,6 +564,7 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var selectedSettingsTab: SettingsSidebarTab = .general
     @Published var statusBannerMessage: String = ""
 
     var customFloatingX: Double?

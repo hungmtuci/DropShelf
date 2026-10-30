@@ -28,7 +28,7 @@ struct ShelfPanelView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectGlassView(material: .popover, blendingMode: .behindWindow)
+            VisualEffectGlassView(material: .menu, blendingMode: .behindWindow)
 
             VStack(spacing: 8) {
                 headerBar
@@ -45,16 +45,20 @@ struct ShelfPanelView: View {
 
                 footerBar
             }
-            .padding(10)
+            .padding(11)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(
                     panelController.isIncomingDragTargeted
-                        ? Color.accentColor.opacity(0.95)
-                        : Color.primary.opacity(0.16),
-                    lineWidth: panelController.isIncomingDragTargeted ? 2.2 : 1.0
+                        ? Color.accentColor
+                        : Color(nsColor: .separatorColor),
+                    lineWidth: panelController.isIncomingDragTargeted ? 2.0 : 0.8
                 )
         )
     }
@@ -420,11 +424,16 @@ struct ShelfPanelView: View {
             updateService.oneClickUpdateFromGitHub()
             panelController.scheduleEmptyAutoHideIfNeeded()
         } label: {
-            HStack(spacing: 4.5) {
-                Image(systemName: config.symbol)
-                    .font(.system(size: 10, weight: .bold))
+            HStack(spacing: 5) {
+                if updateService.isBusy {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Image(systemName: config.symbol)
+                        .font(.system(size: 10, weight: .semibold))
+                }
                 Text(config.title)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 10.5, weight: .medium))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
@@ -436,53 +445,54 @@ struct ShelfPanelView: View {
         }
         .buttonStyle(.plain)
         .disabled(updateService.isBusy)
-        .help("Kiểm tra và tự động cập nhật phiên bản mới trực tiếp từ GitHub Releases (hungmtuci/DropShelf)")
+        .help("Kiểm tra và tự động cập nhật phiên bản mới trực tiếp từ GitHub Releases")
     }
 
     private var shelfUpdateButtonStyle: (title: String, symbol: String, bgColor: Color, fgColor: Color) {
         switch updateService.state {
         case .available(let ver, _, _, _):
             return (
-                "Update GitHub v\(ver)",
+                "Cập nhật v\(ver)",
                 "arrow.down.circle.fill",
-                Color.green.opacity(0.22),
+                Color.green.opacity(0.20),
                 Color.green
             )
         case .checking:
             return (
-                "Đang kiểm tra GitHub...",
+                "Đang kiểm tra...",
                 "arrow.triangle.2.circlepath",
-                Color.accentColor.opacity(0.14),
-                Color.accentColor
+                Color.primary.opacity(0.07),
+                Color.secondary
             )
         case .downloading(let ver):
             return (
                 "Đang tải v\(ver)...",
                 "arrow.down.circle",
-                Color.accentColor.opacity(0.16),
+                Color.accentColor.opacity(0.14),
                 Color.accentColor
             )
         case .installing(let ver):
             return (
                 "Đang cài v\(ver)...",
                 "gearshape.2.fill",
-                Color.orange.opacity(0.18),
+                Color.orange.opacity(0.16),
                 Color.orange
             )
         default:
             if let feedback = updateService.shelfBadgeFeedback {
+                let ok = updateService.isShelfFeedbackPositive
                 return (
                     feedback,
-                    feedback.hasPrefix("✓") ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                    feedback.hasPrefix("✓") ? Color.green.opacity(0.16) : Color.orange.opacity(0.16),
-                    feedback.hasPrefix("✓") ? Color.green : Color.orange
+                    ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                    ok ? Color.green.opacity(0.15) : Color.orange.opacity(0.15),
+                    ok ? Color.green : Color.orange
                 )
             }
             return (
-                "Update qua GitHub",
-                "arrow.triangle.2.circlepath.circle.fill",
-                Color.primary.opacity(0.08),
-                Color.primary.opacity(0.82)
+                "Update GitHub",
+                "arrow.triangle.2.circlepath",
+                Color.primary.opacity(0.07),
+                Color.secondary
             )
         }
     }

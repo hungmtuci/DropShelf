@@ -51,8 +51,8 @@
 ## 📥 Tải về & Cài đặt nhanh (macOS 14.0+ Universal: Apple Silicon & Intel)
 
 1. Tải bộ cài mới nhất tại trang **[Releases](https://github.com/hungmtuci/DropShelf/releases/latest)**:
-   - **`DropShelf-Installer-v1.3.0.dmg`** *(Khuyên dùng)*
-   - Hoặc **`DropShelf-v1.3.0-macOS.zip`** *(Hoặc bấm nút **Update qua GitHub** ngay trên Kệ / Cài đặt để tự nâng cấp 1 chạm!)*
+   - **`DropShelf-Installer-v1.4.0.dmg`** *(Khuyên dùng)*
+   - Hoặc **`DropShelf-v1.4.0-macOS.zip`** *(Hoặc bấm nút **Update qua GitHub** ngay trên Kệ / Cài đặt để tự nâng cấp 1 chạm!)*
 2. Mở file `.dmg`:
    - Kéo `DropShelf.app` thả vào thư mục **`Applications`**, **HOẶC** nhấp chuột phải vào `Cai_Dat_DropShelf.command` → chọn **Open** để tự động cài đặt vào `/Applications` và gỡ cờ cách ly Gatekeeper.
 3. Nếu macOS cảnh báo ứng dụng chưa công chứng Apple Developer ID khi mở lần đầu trên máy mới, chạy lệnh sau trong Terminal:

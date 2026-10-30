@@ -218,11 +218,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             )
             let hosting = NSHostingController(rootView: rootView)
             let win = NSWindow(contentViewController: hosting)
-            win.title = "DropShelf — Kệ kéo thả tệp tạm thời (Cài đặt & Quản lý)"
-            win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            win.title = "DropShelf"
+            win.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            win.titlebarAppearsTransparent = true
+            win.titleVisibility = .hidden
+            win.toolbarStyle = .unified
             win.isReleasedWhenClosed = false
             win.delegate = self
-            win.setContentSize(NSSize(width: 820, height: 750))
+            win.minSize = NSSize(width: 720, height: 500)
+            win.setContentSize(NSSize(width: 780, height: 560))
             win.center()
             self.settingsWindow = win
         }
@@ -260,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func checkUpdatesFromMenu() {
+        AppSettings.shared.selectedSettingsTab = .general
         showSettingsWindow()
         UpdateCheckerService.shared.oneClickUpdateFromGitHub()
     }

@@ -35,6 +35,7 @@ final class UpdateCheckerService: ObservableObject {
         }
     }
     @Published private(set) var shelfBadgeFeedback: String? = nil
+    @Published private(set) var isShelfFeedbackPositive: Bool = true
     @Published private(set) var latestRemoteVersion: String? = nil
     @Published private(set) var latestRemoteZipURL: URL? = nil
     @Published private(set) var lastCheckedDate: Date? = nil
@@ -43,7 +44,7 @@ final class UpdateCheckerService: ObservableObject {
     private var periodicCheckTimer: Timer?
 
     var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.3.0"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.4.0"
     }
 
     var availableVersion: String? {
@@ -120,8 +121,9 @@ final class UpdateCheckerService: ObservableObject {
         }
     }
 
-    private func setTransientShelfFeedback(_ message: String, duration: TimeInterval = 4.5) {
+    private func setTransientShelfFeedback(_ message: String, positive: Bool, duration: TimeInterval = 4.5) {
         feedbackResetWorkItem?.cancel()
+        isShelfFeedbackPositive = positive
         shelfBadgeFeedback = message
         let work = DispatchWorkItem { [weak self] in
             Task { @MainActor in
@@ -139,7 +141,6 @@ final class UpdateCheckerService: ObservableObject {
             feedbackResetWorkItem?.cancel()
             shelfBadgeFeedback = nil
             state = .checking
-            AppSettings.shared.statusBannerMessage = "Đang kết nối GitHub Releases (hungmtuci/DropShelf) để kiểm tra bản cập nhật..."
         }
 
         let cacheBuster = Int(Date().timeIntervalSince1970)
@@ -157,8 +158,7 @@ final class UpdateCheckerService: ObservableObject {
                 if manual {
                     let msg = "Không kết nối được GitHub Releases. Vui lòng kiểm tra mạng và thử lại."
                     state = .failed(message: msg)
-                    setTransientShelfFeedback("Lỗi kết nối GitHub")
-                    AppSettings.shared.statusBannerMessage = msg
+                    setTransientShelfFeedback("Lỗi kết nối GitHub", positive: false)
                 }
                 return
             }
@@ -187,22 +187,18 @@ final class UpdateCheckerService: ObservableObject {
                 )
                 if autoInstallIfNewer {
                     downloadAndInstall(version: remoteVersion, zipURL: zipAssetURL, releasePageURL: pageURL)
-                } else if manual {
-                    AppSettings.shared.statusBannerMessage = "Đã có phiên bản mới DropShelf v\(remoteVersion) trên GitHub! Nhấn 'Update qua GitHub (v\(remoteVersion))' để cài đặt."
                 }
             } else {
                 state = .upToDate(version: localVer)
                 if manual {
-                    setTransientShelfFeedback("✓ Mới nhất v\(localVer)")
-                    AppSettings.shared.statusBannerMessage = "✓ Đã kiểm tra từ GitHub: Bạn đang sử dụng phiên bản mới nhất (v\(localVer))."
+                    setTransientShelfFeedback("Đã mới nhất v\(localVer)", positive: true)
                 }
             }
         } catch {
             if manual {
                 let msg = "Không thể kiểm tra cập nhật từ GitHub (\(error.localizedDescription))."
                 state = .failed(message: msg)
-                setTransientShelfFeedback("Lỗi kiểm tra GitHub")
-                AppSettings.shared.statusBannerMessage = msg
+                setTransientShelfFeedback("Lỗi kiểm tra GitHub", positive: false)
             }
         }
     }
@@ -221,7 +217,6 @@ final class UpdateCheckerService: ObservableObject {
         feedbackResetWorkItem?.cancel()
         shelfBadgeFeedback = nil
         state = .downloading(version: version)
-        AppSettings.shared.statusBannerMessage = "Đang tải gói cập nhật DropShelf v\(version) trực tiếp từ GitHub Releases..."
 
         Task { @MainActor in
             let stageDir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -250,7 +245,6 @@ final class UpdateCheckerService: ObservableObject {
                 try FileManager.default.moveItem(at: tempDownloadedURL, to: zipDest)
 
                 state = .installing(version: version)
-                AppSettings.shared.statusBannerMessage = "Đang giải nén, gỡ Gatekeeper và nâng cấp lên DropShelf v\(version)..."
 
                 let extractedAppURL = try await Self.extractAndValidateZipOffMain(
                     zipPath: zipDest.path,
@@ -279,8 +273,7 @@ final class UpdateCheckerService: ObservableObject {
                 try? FileManager.default.removeItem(at: stageDir)
                 let msg = "Cập nhật tự động thất bại: \(error.localizedDescription) — đang mở trang tải GitHub..."
                 state = .failed(message: msg)
-                setTransientShelfFeedback("Lỗi tải bản mới")
-                AppSettings.shared.statusBannerMessage = msg
+                setTransientShelfFeedback("Lỗi tải bản mới", positive: false)
                 NSWorkspace.shared.open(releasePageURL)
             }
         }

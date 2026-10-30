@@ -10,673 +10,684 @@ struct SettingsDashboardView: View {
     @ObservedObject var updateService: UpdateCheckerService
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                heroCard
+        HStack(spacing: 0) {
+            sidebarPane
+                .frame(width: 220)
 
-                if settings.shouldOfferMoveToApplications {
-                    moveToApplicationsBanner
-                }
+            Divider()
+                .ignoresSafeArea(.container, edges: .top)
 
-                if !settings.statusBannerMessage.isEmpty {
-                    statusBanner
-                }
-
-                githubUpdateFooterSection
-
-                screenshotAutoCaptureSection
-
-                dockAndStartupSection
-
-                positionAndAutoTriggerSection
-
-                dragBehaviorAndShortcutsSection
-            }
-            .padding(22)
+            detailPane
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 740, minHeight: 680)
+        .frame(minWidth: 720, minHeight: 500)
     }
 
-    // MARK: - 1. Hero Card
+    // MARK: - Left Native macOS Vibrancy Sidebar
 
-    private var heroCard: some View {
-        HStack(spacing: 16) {
+    private var sidebarPane: some View {
+        ZStack {
+            VisualEffectGlassView(material: .sidebar, blendingMode: .behindWindow)
+                .ignoresSafeArea(.container, edges: .top)
+
+            VStack(alignment: .leading, spacing: 6) {
+                sidebarAppHeader
+                    .padding(.top, 38)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+
+                VStack(spacing: 3) {
+                    ForEach(SettingsSidebarTab.allCases) { tab in
+                        sidebarRow(for: tab)
+                    }
+                }
+                .padding(.horizontal, 10)
+
+                Spacer(minLength: 12)
+
+                sidebarBottomShelfControl
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 14)
+            }
+        }
+    }
+
+    private var sidebarAppHeader: some View {
+        HStack(spacing: 11) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color.indigo, Color.blue, Color.cyan],
+                            colors: [
+                                Color(red: 0.25, green: 0.38, blue: 0.96),
+                                Color(red: 0.08, green: 0.62, blue: 0.95)
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 60, height: 60)
-                    .shadow(color: Color.indigo.opacity(0.28), radius: 8, y: 4)
+                    .frame(width: 38, height: 38)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.28), lineWidth: 0.8)
+                    )
+                    .shadow(color: Color.black.opacity(0.14), radius: 3, y: 1.5)
 
                 Image(systemName: "tray.and.arrow.down.fill")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 8) {
-                    Text("DropShelf")
-                        .font(.system(size: 19, weight: .bold))
+            VStack(alignment: .leading, spacing: 1.5) {
+                Text("DropShelf")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
 
-                    Text("v\(updateService.currentVersion)")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.15))
-                        .foregroundStyle(Color.accentColor)
-                        .clipShape(Capsule())
-
-                    Text(panelController.isVisible ? "Kệ đang mở" : "Tự trượt khi kéo tệp / chụp màn hình")
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background((panelController.isVisible ? Color.green : Color.secondary).opacity(0.15))
-                        .foregroundStyle(panelController.isVisible ? Color.green : Color.secondary)
-                        .clipShape(Capsule())
-                }
-
-                Text("Kệ tạm thời lấy cảm hứng từ Yoink — kéo thả tệp vào cạnh màn hình, tự động gom ảnh chụp màn hình mới tức thì (0 giây) và tự ẩn gọn sau 3 giây khi trống.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 12)
-
-            VStack(alignment: .trailing, spacing: 7) {
-                Button {
-                    panelController.toggleShelf()
-                } label: {
-                    Label(
-                        panelController.isVisible
-                            ? "Ẩn Kệ nổi (\(settings.hotKeyBinding.readableDisplay))"
-                            : "Hiện Kệ nổi ngay (\(settings.hotKeyBinding.readableDisplay))",
-                        systemImage: "sidebar.right"
-                    )
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.indigo)
-
-                HStack(spacing: 8) {
-                    Button {
-                        store.createDemoSampleItems()
-                    } label: {
-                        Label("Tạo tệp mẫu thử kéo thả", systemImage: "sparkles")
-                            .font(.system(size: 11))
-                    }
-                    .controlSize(.small)
-
-                    updateActionButton
-                }
-            }
-        }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        )
-    }
-
-    @ViewBuilder
-    private var updateActionButton: some View {
-        switch updateService.state {
-        case .available(let ver, _, _, _):
-            Button {
-                updateService.oneClickUpdateFromGitHub()
-            } label: {
-                Label("Update qua GitHub (v\(ver))", systemImage: "arrow.down.circle.fill")
-                    .font(.system(size: 11.5, weight: .bold))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.green)
-            .controlSize(.small)
-
-        case .checking:
-            Button {} label: {
-                Label("Đang kiểm tra GitHub...", systemImage: "arrow.triangle.2.circlepath")
+                Text("Phiên bản \(updateService.currentVersion)")
                     .font(.system(size: 11))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.teal)
-            .controlSize(.small)
-            .disabled(true)
-
-        case .downloading(let ver):
-            Button {} label: {
-                Label("Đang tải v\(ver)...", systemImage: "arrow.down.circle")
-                    .font(.system(size: 11))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.teal)
-            .controlSize(.small)
-            .disabled(true)
-
-        case .installing(let ver):
-            Button {} label: {
-                Label("Đang cài v\(ver)...", systemImage: "gearshape.2.fill")
-                    .font(.system(size: 11))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .controlSize(.small)
-            .disabled(true)
-
-        case .upToDate(let ver):
-            Button {
-                updateService.oneClickUpdateFromGitHub()
-            } label: {
-                Label("✓ Đã mới nhất (v\(ver)) • Kiểm tra lại", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.green)
-            .controlSize(.small)
-
-        default:
-            Button {
-                updateService.oneClickUpdateFromGitHub()
-            } label: {
-                Label("Update qua GitHub", systemImage: "arrow.triangle.2.circlepath.circle.fill")
-                    .font(.system(size: 11.5, weight: .semibold))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.teal)
-            .controlSize(.small)
-        }
-    }
-
-    private var moveToApplicationsBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "externaldrive.badge.plus")
-                .font(.system(size: 18))
-                .foregroundStyle(.orange)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("DropShelf đang chạy ngoài thư mục /Applications")
-                    .font(.system(size: 12.5, weight: .semibold))
-                Text("Di chuyển vào /Applications giúp cập nhật tự động từ GitHub và Khởi động cùng macOS hoạt động ổn định nhất.")
-                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
-
-            Button("Chuyển vào /Applications") {
-                moveSelfToApplications()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .controlSize(.small)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color.orange.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
-        )
-    }
-
-    private var statusBanner: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "info.circle.fill")
-                .foregroundStyle(Color.accentColor)
-            Text(settings.statusBannerMessage)
-                .font(.system(size: 12))
-            Spacer()
-            Button {
-                settings.statusBannerMessage = ""
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.accentColor.opacity(0.1))
-        )
-    }
-
-    // MARK: - 2. Automatic Screenshot Capture Section
-
-    private var screenshotAutoCaptureSection: some View {
-        sectionContainer(
-            title: "TỰ ĐỘNG ĐƯA HÌNH CHỤP MÀN HÌNH VÀO KỆ TỨC THÌ (SCREENSHOT 0 GIÂY)",
-            icon: "camera.viewfinder"
-        ) {
-            VStack(alignment: .leading, spacing: 11) {
-                HStack {
-                    Toggle("Tự động nhận mọi hình chụp màn hình mới và bật Kệ ngay lập tức (⌘⇧3, ⌘⇧4, ⌘⇧5)", isOn: $settings.autoCaptureScreenshots)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12.5, weight: .semibold))
-
-                    Spacer()
-
-                    if settings.autoCaptureScreenshots {
-                        Text("Đang theo dõi: \(screenshotService.primaryWatchedFolderDisplay)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.teal.opacity(0.14))
-                            .foregroundStyle(Color.teal)
-                            .clipShape(Capsule())
-                    }
-                }
-
-                if settings.autoCaptureScreenshots {
-                    Toggle("Nhảy vào Kệ tức thì 0 giây cho cả Chụp toàn màn hình & ⌘⇧5 (Bỏ qua chờ 5s ảnh thu nhỏ góc dưới của macOS)", isOn: $settings.instantScreenshotCapture)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12))
-
-                    Toggle("Tự động bắt cả ảnh chụp màn hình lưu vào Clipboard (⌘⌃⇧3 / ⌘⌃⇧4)", isOn: $settings.autoCaptureClipboardScreenshots)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12))
-                }
-            }
+            Spacer(minLength: 0)
         }
     }
 
-    // MARK: - 3. Dock Visibility & Startup Section
+    private func sidebarRow(for tab: SettingsSidebarTab) -> some View {
+        let isSelected = (settings.selectedSettingsTab == tab)
+        let hasUpdateDot = (tab == .general && updateService.availableVersion != nil)
 
-    private var dockAndStartupSection: some View {
-        sectionContainer(
-            title: "HIỂN THỊ TRÊN THANH DOCK & HỆ THỐNG",
-            icon: "dock.rectangle"
-        ) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    dockModeCard(
-                        isSelected: settings.showInDock,
-                        title: "Hiện trên thanh Dock & Menu Bar",
-                        subtitle: "Hiển thị icon trên thanh Dock, Cmd+Tab và cho phép kéo thả tệp trực tiếp vào icon trên Dock.",
-                        symbol: "dock.arrow.up.rectangle"
-                    ) {
-                        settings.showInDock = true
-                    }
+        return Button {
+            settings.selectedSettingsTab = tab
+        } label: {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(sidebarIconGradient(for: tab))
+                        .frame(width: 22, height: 22)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
+                        )
 
-                    dockModeCard(
-                        isSelected: !settings.showInDock,
-                        title: "Ẩn khỏi thanh Dock (Chỉ Menu Bar)",
-                        subtitle: "Ẩn hoàn toàn khỏi thanh Dock và Cmd+Tab để tối ưu không gian như tiện ích nền Yoink.",
-                        symbol: "menubar.rectangle"
-                    ) {
-                        settings.showInDock = false
-                    }
+                    Image(systemName: tab.symbolName)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
 
-                Divider()
+                Text(tab.title)
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                    .lineLimit(1)
 
-                HStack(spacing: 24) {
-                    Toggle("Tự khởi động cùng macOS", isOn: $settings.launchAtLogin)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12.5, weight: .medium))
+                Spacer(minLength: 4)
 
-                    Toggle("Mở cửa sổ Cài đặt khi khởi động ứng dụng", isOn: $settings.openSettingsOnLaunch)
-                        .toggleStyle(.switch)
-                        .font(.system(size: 12.5, weight: .medium))
-
-                    Spacer()
+                if hasUpdateDot {
+                    Circle()
+                        .fill(isSelected ? Color.white : Color.green)
+                        .frame(width: 7, height: 7)
                 }
             }
-        }
-    }
-
-    private func dockModeCard(
-        isSelected: Bool,
-        title: String,
-        subtitle: String,
-        symbol: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(alignment: .top, spacing: 11) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    .frame(width: 28, height: 28)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack {
-                        Text(title)
-                            .font(.system(size: 12.5, weight: .bold))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.5))
-                    }
-                    Text(subtitle)
-                        .font(.system(size: 11.2))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.11) : Color.primary.opacity(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? Color.accentColor : Color.primary.opacity(0.1),
-                        lineWidth: isSelected ? 1.6 : 1
-                    )
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isSelected ? Color.accentColor : Color.clear)
             )
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - 4. Screen Position, Multi-Monitor, Auto-Show & 3-Second Empty Auto-Hide
+    private func sidebarIconGradient(for tab: SettingsSidebarTab) -> LinearGradient {
+        let colors: [Color]
+        switch tab {
+        case .general:
+            colors = [Color(red: 0.08, green: 0.55, blue: 0.99), Color(red: 0.02, green: 0.40, blue: 0.88)]
+        case .displayAndPosition:
+            colors = [Color(red: 0.40, green: 0.36, blue: 0.94), Color(red: 0.29, green: 0.25, blue: 0.82)]
+        case .screenshots:
+            colors = [Color(red: 0.16, green: 0.72, blue: 0.88), Color(red: 0.04, green: 0.54, blue: 0.78)]
+        case .dragAndShortcuts:
+            colors = [Color(red: 1.00, green: 0.62, blue: 0.08), Color(red: 0.92, green: 0.46, blue: 0.02)]
+        case .systemAndDock:
+            colors = [Color(red: 0.56, green: 0.56, blue: 0.59), Color(red: 0.40, green: 0.40, blue: 0.43)]
+        }
+        return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
+    }
 
-    private var positionAndAutoTriggerSection: some View {
-        sectionContainer(
-            title: "MÀN HÌNH HIỂN THỊ, VỊ TRÍ KỆ & TỰ ẨN SAU 3 GIÂY KHI TRỐNG",
-            icon: "display.2"
-        ) {
-            VStack(alignment: .leading, spacing: 14) {
-                multiMonitorPickerBar
+    private var sidebarBottomShelfControl: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
 
-                Divider()
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(panelController.isVisible ? Color.green : Color.secondary.opacity(0.55))
+                    .frame(width: 7, height: 7)
 
-                HStack(alignment: .top, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Chọn nhanh vị trí neo Kệ")
-                            .font(.system(size: 12, weight: .semibold))
+                Text(panelController.isVisible ? "Kệ đang mở (\(store.totalFileCount) mục)" : "Đang chờ kéo thả")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.top, 2)
 
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.indigo.opacity(0.16), Color.cyan.opacity(0.10)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 236, height: 146)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.2)
-                                )
-
-                            HStack {
-                                VStack(spacing: 10) {
-                                    screenEdgeSlot(.leftTop, label: "Trái Trên")
-                                    screenEdgeSlot(.leftCenter, label: "Trái Giữa")
-                                    screenEdgeSlot(.leftBottom, label: "Trái Dưới")
-                                }
-                                Spacer()
-                                Button {
-                                    settings.edgePosition = .freeFloating
-                                    panelController.showShelfManually()
-                                } label: {
-                                    Text("Tự do")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 5)
-                                        .background(
-                                            settings.edgePosition == .freeFloating
-                                                ? Color.accentColor
-                                                : Color.primary.opacity(0.08)
-                                        )
-                                        .foregroundStyle(settings.edgePosition == .freeFloating ? .white : .secondary)
-                                        .clipShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
-                                Spacer()
-                                VStack(spacing: 10) {
-                                    screenEdgeSlot(.rightTop, label: "Phải Trên")
-                                    screenEdgeSlot(.rightCenter, label: "Phải Giữa")
-                                    screenEdgeSlot(.rightBottom, label: "Phải Dưới")
-                                }
-                            }
-                            .padding(10)
-                            .frame(width: 236, height: 146)
-                        }
-
-                        Text("Đang chọn: \(settings.edgePosition.title)")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    VStack(alignment: .leading, spacing: 11) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Thời điểm tự động hiện Kệ khi kéo chuột")
-                                .font(.system(size: 12, weight: .semibold))
-
-                            Picker("", selection: $settings.autoShowTrigger) {
-                                ForEach(AutoShowTrigger.allCases) { mode in
-                                    Text(mode.title).tag(mode)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-
-                            Text(settings.autoShowTrigger.shortNote)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        HStack(spacing: 10) {
-                            Text("Tự ẩn khi Kệ trống (lướt nhầm chuột):")
-                                .font(.system(size: 12, weight: .semibold))
-                            Picker("", selection: $settings.emptyAutoHideOption) {
-                                ForEach(EmptyAutoHideOption.allCases) { opt in
-                                    Text(opt.title).tag(opt)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(width: 175)
-                        }
-
-                        HStack(spacing: 16) {
-                            Text("Kích thước Kệ:")
-                                .font(.system(size: 12, weight: .semibold))
-                            Picker("", selection: $settings.shelfSize) {
-                                ForEach(ShelfSizePreset.allCases) { preset in
-                                    Text(preset.title).tag(preset)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                            .frame(width: 240)
-                        }
-
-                        Toggle("Hiện thanh gờ mỏng sát mép tất cả màn hình (rê hoặc kéo tệp chạm mép để mở kệ)", isOn: $settings.showEdgeHandle)
-                            .toggleStyle(.switch)
-                            .font(.system(size: 12))
-
-                        Toggle("Ghim giữ Kệ luôn hiển thị cố định trên màn hình (bỏ qua tự ẩn)", isOn: $settings.isShelfPinned)
-                            .toggleStyle(.switch)
-                            .font(.system(size: 12))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                panelController.toggleShelf()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sidebar.right")
+                    Text(panelController.isVisible ? "Ẩn Kệ nổi" : "Hiện Kệ nổi")
+                    Spacer()
+                    Text(settings.hotKeyBinding.readableDisplay)
+                        .font(.system(size: 11, design: .monospaced))
+                        .opacity(0.85)
                 }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+    }
+
+    // MARK: - Right Native macOS Grouped Detail Pane
+
+    private var detailPane: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(settings.selectedSettingsTab.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                if settings.selectedSettingsTab != .general {
+                    compactHeaderGitHubButton
+                }
+            }
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+            .padding(.horizontal, 22)
+
+            switch settings.selectedSettingsTab {
+            case .general:
+                generalSettingsForm
+            case .displayAndPosition:
+                displayAndPositionForm
+            case .screenshots:
+                screenshotsSettingsForm
+            case .dragAndShortcuts:
+                dragAndShortcutsForm
+            case .systemAndDock:
+                systemAndDockForm
             }
         }
     }
 
-    private var multiMonitorPickerBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Chọn màn hình hiển thị cửa sổ Kệ (\(max(1, panelController.availableDisplays.count)) màn hình đang kết nối)")
-                    .font(.system(size: 12.5, weight: .semibold))
+    @ViewBuilder
+    private var compactHeaderGitHubButton: some View {
+        if updateService.isBusy {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(busyStatusShortText)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+        } else if let avail = updateService.availableVersion {
+            Button {
+                updateService.oneClickUpdateFromGitHub()
+            } label: {
+                Label("Cập nhật v\(avail)", systemImage: "arrow.down.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .controlSize(.small)
+        } else {
+            Button {
+                updateService.oneClickUpdateFromGitHub()
+            } label: {
+                Label("Update qua GitHub", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .controlSize(.small)
+        }
+    }
+
+    // MARK: - Tab 1: Tổng quan & Cập nhật
+
+    private var generalSettingsForm: some View {
+        Form {
+            if settings.shouldOfferMoveToApplications {
+                Section {
+                    LabeledContent {
+                        Button("Chuyển vào /Applications") {
+                            moveSelfToApplications()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                    } label: {
+                        Text("Chưa cài trong thư mục Ứng dụng")
+                        Text("Di chuyển vào /Applications giúp tự động cập nhật từ GitHub và Khởi động cùng macOS hoạt động ổn định.")
+                    }
+                }
+            }
+
+            Section("Kệ kéo thả tạm thời") {
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        Button("Tạo tệp mẫu") {
+                            store.createDemoSampleItems()
+                        }
+
+                        Button(panelController.isVisible ? "Ẩn Kệ" : "Mở Kệ") {
+                            panelController.toggleShelf()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } label: {
+                    Text("Trạng thái Kệ nổi")
+                    Text("Đang lưu \(store.totalFileCount) tệp tạm • Vị trí neo: \(settings.edgePosition.title)")
+                }
+
+                Toggle(isOn: $settings.isShelfPinned) {
+                    Text("Ghim giữ Kệ luôn hiển thị")
+                    Text("Giữ cửa sổ Kệ cố định trên màn hình và bỏ qua bộ đếm tự ẩn khi Kệ trống.")
+                }
+            }
+
+            Section("Cập nhật phần mềm (GitHub Releases)") {
+                LabeledContent {
+                    primaryGitHubUpdateControl
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("DropShelf v\(updateService.currentVersion)")
+                            .fontWeight(.medium)
+
+                        if let avail = updateService.availableVersion {
+                            Text("Mới: v\(avail)")
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1.5)
+                                .background(Color.green.opacity(0.16))
+                                .foregroundStyle(Color.green)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text(updateStatusDescription)
+                }
+
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        Button("Cài lại từ GitHub") {
+                            updateService.reinstallLatestFromGitHub()
+                        }
+                        .disabled(updateService.isBusy)
+                        .help("Tải lại gói .zip mới nhất trên GitHub Releases và cài đè lên ứng dụng hiện tại")
+
+                        Button("Xem trên GitHub") {
+                            if let url = URL(string: "https://github.com/hungmtuci/DropShelf/releases/latest") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                    }
+                } label: {
+                    Text("Kho phát hành chính thức")
+                    Text("github.com/hungmtuci/DropShelf")
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var primaryGitHubUpdateControl: some View {
+        switch updateService.state {
+        case .checking, .downloading, .installing:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(busyStatusShortText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+        case .available(let ver, _, _, _):
+            Button {
+                updateService.oneClickUpdateFromGitHub()
+            } label: {
+                Label("Cập nhật v\(ver)", systemImage: "arrow.down.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+
+        case .upToDate:
+            Button {
+                updateService.oneClickUpdateFromGitHub()
+            } label: {
+                Label("Kiểm tra lại", systemImage: "arrow.clockwise")
+            }
+
+        default:
+            Button {
+                updateService.oneClickUpdateFromGitHub()
+            } label: {
+                Label("Update qua GitHub", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private var busyStatusShortText: String {
+        switch updateService.state {
+        case .checking:
+            return "Đang kiểm tra..."
+        case .downloading(let ver):
+            return "Đang tải v\(ver)..."
+        case .installing(let ver):
+            return "Đang cài v\(ver)..."
+        default:
+            return "Đang xử lý..."
+        }
+    }
+
+    private var updateStatusDescription: String {
+        switch updateService.state {
+        case .idle:
+            return "Tự động kiểm tra, tải bản mới nhất trên GitHub và nâng cấp 1 chạm."
+        case .checking:
+            return "Đang kết nối tới GitHub Releases..."
+        case .upToDate(let ver):
+            return "Bạn đang sử dụng phiên bản mới nhất (v\(ver))."
+        case .available(let ver, _, _, _):
+            return "Đã có bản cập nhật mới v\(ver) sẵn sàng tải về từ GitHub."
+        case .downloading(let ver):
+            return "Đang tải gói DropShelf v\(ver) từ GitHub Releases..."
+        case .installing(let ver):
+            return "Đang giải nén và nâng cấp lên phiên bản v\(ver)..."
+        case .failed(let msg):
+            return msg
+        }
+    }
+
+    // MARK: - Tab 2: Màn hình & Vị trí
+
+    private var displaySelectionBinding: Binding<Int> {
+        Binding<Int>(
+            get: {
+                if settings.displayMode == .specificDisplay,
+                   let id = settings.preferredDisplayID,
+                   panelController.availableDisplays.contains(where: { $0.displayID == id }) {
+                    return Int(id)
+                }
+                return -1
+            },
+            set: { newValue in
+                if newValue == -1 {
+                    panelController.selectFollowActiveScreen()
+                } else {
+                    panelController.selectSpecificDisplay(UInt32(bitPattern: Int32(truncatingIfNeeded: newValue)))
+                }
+            }
+        )
+    }
+
+    private var displayAndPositionForm: some View {
+        Form {
+            Section("Màn hình hiển thị") {
+                Picker(selection: displaySelectionBinding) {
+                    Text("Tự động theo màn hình đang thao tác").tag(-1)
+                    Divider()
+                    ForEach(panelController.availableDisplays) { disp in
+                        Label(disp.detailedTitle, systemImage: disp.symbolName)
+                            .tag(Int(disp.displayID))
+                    }
+                } label: {
+                    Text("Hiển thị cửa sổ Kệ trên")
+                    Text("Tự động chuyển Kệ sang màn hình bạn vừa bấm chuột hoặc cố định trên 1 màn hình.")
+                }
+
+                if panelController.availableDisplays.count > 1 {
+                    LabeledContent {
+                        Button {
+                            panelController.cycleToNextScreen()
+                        } label: {
+                            Label("Chuyển sang màn hình kia", systemImage: "display.2")
+                        }
+                    } label: {
+                        Text("Đổi nhanh màn hình")
+                        Text("Đang kết nối \(panelController.availableDisplays.count) màn hình.")
+                    }
+                }
+            }
+
+            Section("Vị trí neo & Kích thước") {
+                VStack(alignment: .center, spacing: 10) {
+                    macOSDesktopPositionPreview
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+
+                Picker("Vị trí neo trên màn hình", selection: $settings.edgePosition) {
+                    ForEach(ShelfEdgePosition.allCases) { pos in
+                        Text(pos.title).tag(pos)
+                    }
+                }
+
+                Picker("Kích thước Kệ", selection: $settings.shelfSize) {
+                    ForEach(ShelfSizePreset.allCases) { preset in
+                        Text(preset.title).tag(preset)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Tự động hiện & Tự động ẩn") {
+                Picker(selection: $settings.autoShowTrigger) {
+                    ForEach(AutoShowTrigger.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                } label: {
+                    Text("Khi bắt đầu kéo tệp")
+                    Text(settings.autoShowTrigger.shortNote)
+                }
+
+                Picker(selection: $settings.emptyAutoHideOption) {
+                    ForEach(EmptyAutoHideOption.allCases) { opt in
+                        Text(opt.title).tag(opt)
+                    }
+                } label: {
+                    Text("Tự ẩn khi Kệ trống")
+                    Text("Tự đóng gọn nếu chuột vô tình lướt chạm mép màn hình mà không thả nội dung vào.")
+                }
+
+                Toggle(isOn: $settings.showEdgeHandle) {
+                    Text("Hiện thanh gờ mảnh sát mép màn hình")
+                    Text("Rê chuột hoặc kéo tệp chạm nhẹ vào thanh gờ để gọi Kệ ra ngay.")
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var macOSDesktopPositionPreview: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(0.16),
+                            Color(nsColor: .controlAccentColor).opacity(0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 296, height: 148)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
+
+            // Simulated macOS Menu Bar & Dock silhouette
+            VStack {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 10,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 10
+                )
+                .fill(Color.primary.opacity(0.06))
+                .frame(height: 12)
 
                 Spacer()
 
-                if panelController.availableDisplays.count > 1 {
-                    Button {
-                        panelController.cycleToNextScreen()
-                    } label: {
-                        Label("Chuyển Kệ sang màn hình kia ngay", systemImage: "arrow.left.arrow.right.square")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .controlSize(.small)
-                }
+                Capsule()
+                    .fill(Color.primary.opacity(0.10))
+                    .frame(width: 76, height: 8)
+                    .padding(.bottom, 6)
             }
+            .frame(width: 296, height: 148)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    let isAuto = settings.displayMode == .followActiveScreen
-                    Button {
-                        panelController.selectFollowActiveScreen()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "cursorarrow.motionlines")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(isAuto ? Color.accentColor : Color.secondary)
+            HStack {
+                VStack(spacing: 8) {
+                    screenEdgeSlot(.leftTop, label: "Trái Trên")
+                    screenEdgeSlot(.leftCenter, label: "Trái Giữa")
+                    screenEdgeSlot(.leftBottom, label: "Trái Dưới")
+                }
 
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Tự động theo màn hình đang chọn")
-                                    .font(.system(size: 11.5, weight: .bold))
-                                    .foregroundStyle(.primary)
-                                Text("Tự nhảy sang màn hình bạn bấm chuột / kéo thả")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-                            }
+                Spacer()
 
-                            Image(systemName: isAuto ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(isAuto ? Color.accentColor : Color.secondary.opacity(0.45))
-                        }
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 8)
+                Button {
+                    settings.edgePosition = .freeFloating
+                    panelController.showShelfManually()
+                } label: {
+                    Text("Tự do")
+                        .font(.system(size: 11, weight: .medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
                         .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(isAuto ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.035))
+                            settings.edgePosition == .freeFloating
+                                ? Color.accentColor
+                                : Color(nsColor: .controlBackgroundColor)
                         )
+                        .foregroundStyle(settings.edgePosition == .freeFloating ? Color.white : Color.primary)
+                        .clipShape(Capsule())
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(isAuto ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isAuto ? 1.5 : 1)
+                            Capsule()
+                                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: settings.edgePosition == .freeFloating ? 0 : 0.8)
                         )
-                    }
-                    .buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
 
-                    ForEach(panelController.availableDisplays) { disp in
-                        let isPinnedHere = (settings.displayMode == .specificDisplay && settings.preferredDisplayID == disp.displayID)
-                        let isShelfCurrentlyHere = (panelController.currentDisplayID == disp.displayID)
+                Spacer()
 
-                        Button {
-                            panelController.selectSpecificDisplay(disp.displayID)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "display")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(isPinnedHere ? Color.accentColor : (isShelfCurrentlyHere ? Color.green : Color.secondary))
-
-                                VStack(alignment: .leading, spacing: 1) {
-                                    HStack(spacing: 5) {
-                                        Text(disp.shortTitle)
-                                            .font(.system(size: 11.5, weight: .bold))
-                                            .foregroundStyle(.primary)
-                                        if isShelfCurrentlyHere {
-                                            Circle()
-                                                .fill(Color.green)
-                                                .frame(width: 6, height: 6)
-                                        }
-                                    }
-                                    Text("\(disp.resolutionText)\(isShelfCurrentlyHere ? " • Đang hiện Kệ" : "")")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Image(systemName: isPinnedHere ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(isPinnedHere ? Color.accentColor : Color.secondary.opacity(0.45))
-                            }
-                            .padding(.horizontal, 11)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(isPinnedHere ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.035))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .strokeBorder(isPinnedHere ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isPinnedHere ? 1.5 : 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                VStack(spacing: 8) {
+                    screenEdgeSlot(.rightTop, label: "Phải Trên")
+                    screenEdgeSlot(.rightCenter, label: "Phải Giữa")
+                    screenEdgeSlot(.rightBottom, label: "Phải Dưới")
                 }
             }
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .frame(width: 296, height: 148)
         }
     }
 
     private func screenEdgeSlot(_ position: ShelfEdgePosition, label: String) -> some View {
-        let active = settings.edgePosition == position
+        let active = (settings.edgePosition == position)
         return Button {
             settings.edgePosition = position
             panelController.showShelfManually()
         } label: {
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(active ? Color.accentColor : Color.primary.opacity(0.16))
-                .frame(width: 58, height: 28)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(active ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                .frame(width: 68, height: 26)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(active ? Color.clear : Color(nsColor: .separatorColor), lineWidth: 0.8)
+                )
                 .overlay(
                     Text(label)
-                        .font(.system(size: 9.5, weight: .semibold))
+                        .font(.system(size: 10.5, weight: active ? .semibold : .regular))
                         .foregroundStyle(active ? Color.white : Color.primary)
                 )
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - 5. Drag Behavior, Stacks & Global HotKey
+    // MARK: - Tab 3: Chụp màn hình
 
-    private var dragBehaviorAndShortcutsSection: some View {
-        sectionContainer(
-            title: "HÀNH VI KÉO THẢ, SMART STACK & PHÍM TẮT TOÀN CỤC",
-            icon: "hand.draw"
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Text("Khi kéo tệp từ Kệ ra Finder:")
-                        .font(.system(size: 12.5, weight: .semibold))
-                    Picker("", selection: $settings.dragOutBehavior) {
-                        ForEach(DragOutBehavior.allCases) { item in
-                            Text(item.title).tag(item)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
+    private var screenshotsSettingsForm: some View {
+        Form {
+            Section("Tự động bắt ảnh chụp màn hình") {
+                Toggle(isOn: $settings.autoCaptureScreenshots) {
+                    Text("Tự động đưa hình chụp màn hình mới vào Kệ")
+                    Text("Theo dõi ảnh chụp ⌘⇧3, ⌘⇧4, ⌘⇧5 và tự bật Kệ ngay lập tức với 0% CPU nền.")
                 }
 
-                Toggle("Tự động gỡ mục khỏi kệ sau khi kéo thả thành công đến vị trí mới (các mục Ghim 📌 luôn giữ lại)", isOn: $settings.autoRemoveAfterDrop)
-                    .toggleStyle(.switch)
-                    .font(.system(size: 12))
+                Toggle(isOn: $settings.instantScreenshotCapture) {
+                    Text("Nhảy vào Kệ tức thì (0 giây)")
+                    Text("Tắt thời gian chờ 5 giây của ảnh thu nhỏ góc dưới macOS để chụp toàn màn hình vào Kệ ngay.")
+                }
+                .disabled(!settings.autoCaptureScreenshots)
 
-                Toggle("Tự động gộp nhóm (Smart Stack) khi kéo thả nhiều tệp vào kệ cùng lúc", isOn: $settings.autoStackMultipleFiles)
-                    .toggleStyle(.switch)
-                    .font(.system(size: 12))
+                Toggle(isOn: $settings.autoCaptureClipboardScreenshots) {
+                    Text("Tự động bắt ảnh chụp lưu vào Clipboard")
+                    Text("Đóng gói ảnh chụp bằng ⌘⌃⇧3 / ⌘⌃⇧4 thành tệp PNG sẵn sàng kéo thả ra Zalo, Slack, Mail.")
+                }
+                .disabled(!settings.autoCaptureScreenshots)
+            }
 
-                Toggle("Lưu giữ các mục đang có trên kệ khi thoát / khởi động lại DropShelf", isOn: $settings.persistItemsAcrossLaunches)
-                    .toggleStyle(.switch)
-                    .font(.system(size: 12))
+            Section("Thư mục ảnh chụp macOS") {
+                LabeledContent {
+                    Button("Mở trong Finder") {
+                        if let first = screenshotService.watchedDirectories.first {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: first))
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(Color.accentColor)
+                        Text(screenshotService.primaryWatchedFolderDisplay)
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    Text("Tự động đồng bộ theo cấu hình thư mục lưu ảnh chụp của hệ thống macOS.")
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
 
-                Divider()
+    // MARK: - Tab 4: Kéo thả & Phím tắt
 
-                HStack(spacing: 10) {
-                    Text("Phím tắt Hiện / Ẩn Kệ nổi:")
-                        .font(.system(size: 12.5, weight: .semibold))
+    private var dragAndShortcutsForm: some View {
+        Form {
+            Section("Hành vi kéo thả tệp") {
+                Picker("Khi kéo tệp từ Kệ ra Finder", selection: $settings.dragOutBehavior) {
+                    ForEach(DragOutBehavior.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
 
+                Toggle(isOn: $settings.autoRemoveAfterDrop) {
+                    Text("Tự gỡ mục khỏi Kệ sau khi kéo thả xong")
+                    Text("Các mục được đánh dấu Ghim sẽ luôn được giữ lại trên Kệ.")
+                }
+
+                Toggle(isOn: $settings.autoStackMultipleFiles) {
+                    Text("Tự động gộp nhóm (Smart Stack)")
+                    Text("Gom thành 1 thẻ nhóm gọn gàng khi kéo thả nhiều tệp vào Kệ cùng lúc.")
+                }
+
+                Toggle(isOn: $settings.persistItemsAcrossLaunches) {
+                    Text("Giữ lại các mục trên Kệ khi thoát ứng dụng")
+                    Text("Khôi phục danh sách tệp tạm ở lần mở DropShelf tiếp theo.")
+                }
+            }
+
+            Section("Phím tắt toàn cục") {
+                LabeledContent {
                     Button {
                         if hotKeyService.isRecordingShortcut {
                             hotKeyService.stopRecordingShortcut()
@@ -685,153 +696,80 @@ struct SettingsDashboardView: View {
                             hotKeyService.startRecordingShortcut()
                         }
                     } label: {
-                        Text(hotKeyService.isRecordingShortcut ? "Nhấn tổ hợp phím mới... (Esc huỷ)" : settings.hotKeyBinding.readableDisplay)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
+                        Text(hotKeyService.isRecordingShortcut ? "Nhấn phím tắt mới... (Esc huỷ)" : settings.hotKeyBinding.readableDisplay)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .frame(minWidth: 64)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(hotKeyService.isRecordingShortcut ? .orange : .accentColor)
-                    .controlSize(.small)
-
-                    Text("Chọn nhanh:")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-
-                    Button("⌃Y (Mặc định)") {
-                        settings.hotKeyBinding = .defaultToggle
-                    }
-                    .controlSize(.small)
-
-                    Button("F5 (Kiểu Yoink)") {
-                        settings.hotKeyBinding = .f5Preset
-                    }
-                    .controlSize(.small)
-
-                    Button("⌥Space") {
-                        settings.hotKeyBinding = .optSpacePreset
-                    }
-                    .controlSize(.small)
-
-                    Spacer()
+                } label: {
+                    Text("Phím tắt Hiện / Ẩn Kệ nổi")
+                    Text("Nhấn nút bên phải để ghi tổ hợp phím mới bất kỳ.")
                 }
-            }
-        }
-    }
 
-    // MARK: - GitHub Releases 1-Click Auto-Update Section
-
-    private var githubUpdateFooterSection: some View {
-        sectionContainer(
-            title: "UPDATE TỰ ĐỘNG QUA GITHUB RELEASES (1 CHẠM)",
-            icon: "arrow.triangle.2.circlepath.circle.fill"
-        ) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text("Kho phát hành chính thức: github.com/hungmtuci/DropShelf")
-                                .font(.system(size: 12.5, weight: .semibold))
-
-                            if let remoteVer = updateService.latestRemoteVersion {
-                                Text("GitHub: v\(remoteVer)")
-                                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 2)
-                                    .background(Color.teal.opacity(0.15))
-                                    .foregroundStyle(Color.teal)
-                                    .clipShape(Capsule())
-                            }
-                        }
-
-                        Text(updateStatusDescription)
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        Button {
-                            if let url = URL(string: "https://github.com/hungmtuci/DropShelf/releases/latest") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        } label: {
-                            Label("Mở GitHub", systemImage: "safari")
-                                .font(.system(size: 11.5))
+                LabeledContent("Chọn nhanh mẫu phím tắt") {
+                    HStack(spacing: 6) {
+                        Button("⌃Y (Mặc định)") {
+                            settings.hotKeyBinding = .defaultToggle
                         }
                         .controlSize(.small)
 
-                        if !updateService.isBusy {
-                            Button {
-                                updateService.reinstallLatestFromGitHub()
-                            } label: {
-                                Label("Tải & Cài lại từ GitHub", systemImage: "arrow.clockwise.circle")
-                                    .font(.system(size: 11.5))
-                            }
-                            .controlSize(.small)
-                            .help("Buộc tải lại gói .zip mới nhất từ GitHub Releases và cài đè ứng dụng hiện tại")
+                        Button("F5 (Yoink)") {
+                            settings.hotKeyBinding = .f5Preset
                         }
+                        .controlSize(.small)
 
-                        updateActionButton
+                        Button("⌥Space") {
+                            settings.hotKeyBinding = .optSpacePreset
+                        }
+                        .controlSize(.small)
                     }
                 }
             }
         }
+        .formStyle(.grouped)
     }
 
-    private var updateStatusDescription: String {
-        switch updateService.state {
-        case .idle:
-            return "Nhấn 'Update qua GitHub' để tự động kiểm tra, tải bản mới nhất, gỡ Gatekeeper và nâng cấp ngay (không cần cài thủ công)."
-        case .checking:
-            return "Đang kết nối tới GitHub Releases (hungmtuci/DropShelf)..."
-        case .upToDate(let ver):
-            return "✓ Bạn đang sử dụng phiên bản mới nhất trên GitHub (v\(ver))."
-        case .available(let ver, _, _, _):
-            return "Đã phát hiện phiên bản mới v\(ver) trên GitHub! Nhấn 'Update qua GitHub (v\(ver))' để tự động tải và nâng cấp."
-        case .downloading(let ver):
-            return "Đang tải gói cập nhật DropShelf v\(ver) trực tiếp từ GitHub Releases..."
-        case .installing(let ver):
-            return "Đang giải nén, gỡ cờ Gatekeeper và thay thế phiên bản v\(ver)..."
-        case .failed(let msg):
-            return msg
-        }
-    }
+    // MARK: - Tab 5: Hệ thống & Dock
 
-    // MARK: - Helpers
-
-    private func sectionContainer<Content: View>(
-        title: String,
-        icon: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.accentColor)
-                Text(title)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
+    private var systemAndDockForm: some View {
+        Form {
+            Section("Thanh Dock & Menu Bar") {
+                Toggle(isOn: $settings.showInDock) {
+                    Text("Hiển thị biểu tượng trên thanh Dock")
+                    Text("Khi tắt, DropShelf ẩn khỏi thanh Dock và ⌘Tab, chỉ hiện gọn trên thanh Menu Bar.")
+                }
             }
 
-            VStack(alignment: .leading, spacing: 0) {
-                content()
+            Section("Khởi động cùng hệ thống") {
+                Toggle(isOn: $settings.launchAtLogin) {
+                    Text("Tự khởi động cùng macOS")
+                    Text("Tự động chạy nền sẵn sàng ngay khi bạn đăng nhập vào máy Mac.")
+                }
+
+                Toggle(isOn: $settings.openSettingsOnLaunch) {
+                    Text("Mở cửa sổ Cài đặt khi khởi động ứng dụng")
+                    Text("Tắt tuỳ chọn này nếu bạn muốn ứng dụng khởi động hoàn toàn im lặng ở nền.")
+                }
+
+                if !settings.statusBannerMessage.isEmpty {
+                    LabeledContent {
+                        Button("Đóng") {
+                            settings.statusBannerMessage = ""
+                        }
+                        .controlSize(.small)
+                    } label: {
+                        Label(settings.statusBannerMessage, systemImage: "info.circle.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            .padding(15)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.035))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.09), lineWidth: 1)
-            )
         }
+        .formStyle(.grouped)
     }
+
+    // MARK: - Move to /Applications Helper
 
     private func moveSelfToApplications() {
         let src = Bundle.main.bundlePath
